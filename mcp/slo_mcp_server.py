@@ -8,8 +8,9 @@ from fastmcp import FastMCP
 mcp = FastMCP(
     name="Sovereign Lightning Oracle",
     instructions=(
-        "You have access to a live price oracle supporting 7 trading pairs "
-        "(BTC/USD, BTC/USD VWAP, ETH/USD, EUR/USD, XAU/USD, BTC/EUR, SOL/USD) "
+        "You have access to a live price oracle supporting 11 trading pairs "
+        "(BTC/USD, BTC/USD VWAP, ETH/USD, EUR/USD, XAU/USD, SOL/USD, BTC/EUR, "
+        "ETH/EUR, SOL/EUR, XAU/EUR, BTC/EUR VWAP) "
         "with two payment protocols:\n"
         "  • L402 (Lightning): pays real sats automatically via Lightning Network\n"
         "  • x402 (SHO): pays USDC on Base chain via the Sovereign HTTP Oracle\n"
@@ -41,6 +42,10 @@ L402_ORACLE_URLS = {
     "xauusd":      f"{L402_BASE}/oracle/xauusd",
     "btceur":      f"{L402_BASE}/oracle/btceur",
     "solusd":      f"{L402_BASE}/oracle/solusd",
+    "etheur":      f"{L402_BASE}/oracle/etheur",
+    "soleur":      f"{L402_BASE}/oracle/soleur",
+    "xaueur":      f"{L402_BASE}/oracle/xaueur",
+    "btceur_vwap": f"{L402_BASE}/oracle/btceur/vwap",
 }
 
 SHO_ORACLE_URLS = {
@@ -51,6 +56,10 @@ SHO_ORACLE_URLS = {
     "xauusd":      f"{SHO_BASE}/oracle/xauusd",
     "btceur":      f"{SHO_BASE}/oracle/btceur",
     "solusd":      f"{SHO_BASE}/oracle/solusd",
+    "etheur":      f"{SHO_BASE}/oracle/etheur",
+    "soleur":      f"{SHO_BASE}/oracle/soleur",
+    "xaueur":      f"{SHO_BASE}/oracle/xaueur",
+    "btceur_vwap": f"{SHO_BASE}/oracle/btceur/vwap",
 }
 
 # DLC endpoints (free endpoints use domain, paid attestation uses direct IP)
@@ -252,7 +261,7 @@ def get_xauusd_spot() -> dict:
 def get_btceur_spot() -> dict:
     """Get the current BTC/EUR spot price from the Sovereign Lightning Oracle.
     Costs 10 sats paid via Lightning. Cross-rate derived from
-    BTCUSD (9 sources) and EURUSD (7 sources)."""
+    BTCUSD (9 sources) and EURUSD (8 sources)."""
     data = _fetch_l402(L402_ORACLE_URLS["btceur"])
     return _build_result(data, "secp256k1")
 
@@ -270,6 +279,35 @@ def get_solusd_spot() -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # x402 / SHO Tools (USDC on Base payment)
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def get_etheur_spot() -> dict:
+    """Get ETH/EUR spot. 10 sats Lightning. Hybrid: 3 direct EUR + cross-rate."""
+    data = _fetch_l402(L402_ORACLE_URLS["etheur"])
+    return _build_result(data, "secp256k1")
+
+
+@mcp.tool()
+def get_soleur_spot() -> dict:
+    """Get SOL/EUR spot. 10 sats Lightning. Hybrid: 3 direct EUR + cross-rate."""
+    data = _fetch_l402(L402_ORACLE_URLS["soleur"])
+    return _build_result(data, "secp256k1")
+
+
+@mcp.tool()
+def get_xaueur_spot() -> dict:
+    """Get XAU/EUR spot. 10 sats Lightning. Cross-rate from XAUUSD and EURUSD."""
+    data = _fetch_l402(L402_ORACLE_URLS["xaueur"])
+    return _build_result(data, "secp256k1")
+
+
+@mcp.tool()
+def get_btceur_vwap() -> dict:
+    """Get BTC/EUR VWAP. 20 sats Lightning. Cross-rate from BTCUSD VWAP and EURUSD."""
+    data = _fetch_l402(L402_ORACLE_URLS["btceur_vwap"])
+    return _build_result(data, "secp256k1")
+
 
 @mcp.tool()
 def sho_get_info() -> dict:
@@ -352,6 +390,43 @@ def sho_get_solusd_spot() -> dict:
     """Get SOL/USD spot price via x402/SHO (USDC on Base).
     Costs $0.001 USDC."""
     data = _fetch_sho(SHO_ORACLE_URLS["solusd"])
+    if data.get("_sho_status") == "payment_required":
+        return data
+    return _build_result(data, "ed25519")
+
+
+
+@mcp.tool()
+def sho_get_etheur_spot() -> dict:
+    """Get ETH/EUR spot via x402/SHO. $0.001 USDC. Hybrid: 3 direct EUR + cross-rate."""
+    data = _fetch_sho(SHO_ORACLE_URLS["etheur"])
+    if data.get("_sho_status") == "payment_required":
+        return data
+    return _build_result(data, "ed25519")
+
+
+@mcp.tool()
+def sho_get_soleur_spot() -> dict:
+    """Get SOL/EUR spot via x402/SHO. $0.001 USDC. Hybrid: 3 direct EUR + cross-rate."""
+    data = _fetch_sho(SHO_ORACLE_URLS["soleur"])
+    if data.get("_sho_status") == "payment_required":
+        return data
+    return _build_result(data, "ed25519")
+
+
+@mcp.tool()
+def sho_get_xaueur_spot() -> dict:
+    """Get XAU/EUR spot via x402/SHO. $0.001 USDC. Cross-rate from XAUUSD and EURUSD."""
+    data = _fetch_sho(SHO_ORACLE_URLS["xaueur"])
+    if data.get("_sho_status") == "payment_required":
+        return data
+    return _build_result(data, "ed25519")
+
+
+@mcp.tool()
+def sho_get_btceur_vwap() -> dict:
+    """Get BTC/EUR VWAP via x402/SHO. $0.002 USDC. Cross-rate from BTCUSD VWAP and EURUSD."""
+    data = _fetch_sho(SHO_ORACLE_URLS["btceur_vwap"])
     if data.get("_sho_status") == "payment_required":
         return data
     return _build_result(data, "ed25519")
