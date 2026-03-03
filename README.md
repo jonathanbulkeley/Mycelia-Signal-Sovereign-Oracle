@@ -237,6 +237,32 @@ The BTCUSD spot oracle and DLC attestor share the same price feed (`oracle/feeds
 
 The USDT/USD rate is sourced from Kraken and Bitstamp (median). If the USD median and USDT median diverge by more than 0.5%, USDT sources are dropped automatically. Minimum 6 of 9 sources required for a valid price.
 
+## Source Thresholds and Safety Mechanisms
+
+Each pair requires a minimum number of sources to produce a valid attestation. If the threshold is not met, the endpoint returns an error rather than serving unreliable data.
+
+| Pair | Total Sources | Minimum Required | Adaptive Condition |
+|---|---|---|---|
+| BTC/USD Spot | 9 | 6 | Drops to 4 if USDT sources excluded (>0.5% USD/USDT divergence) |
+| BTC/USD VWAP | 7 | 4 | Drops to 3 if USDT sources excluded |
+| ETH/USD | 5 | 3 | — |
+| EUR/USD | 8 | 4 | — |
+| XAU/USD | 8 | 3 | Drops to 2 if PAXG-derived sources excluded |
+| SOL/USD | 9 | 5 | Drops to 3 if USDT sources excluded |
+| ETH/EUR | 4 | 2 | — |
+| SOL/EUR | 4 | 2 | — |
+| BTC/EUR | 17 (composite) | Inherited | Fails if BTC/USD (min 6) or EUR/USD (min 4) fails |
+| XAU/EUR | Combined | Inherited | Fails if XAU/USD (min 3) or EUR/USD (min 4) fails |
+| BTC/EUR VWAP | Combined | Inherited | Fails if BTC/USD VWAP (min 4) or EUR/USD (min 4) fails |
+
+### USDT Normalization
+
+BTC/USD, BTC/USD VWAP, and SOL/USD include USDT-denominated sources (Binance, OKX, Gate.io) that are normalized to USD using a live USDT/USD rate from Kraken and Bitstamp. If the USD and USDT medians diverge by more than 0.5%, USDT sources are automatically dropped and the minimum threshold is reduced.
+
+### XAU/USD Source Composition
+
+XAU/USD aggregates from 3 bullion dealers (Kitco, JM Bullion, GoldBroker) and 5 crypto exchanges trading PAXG (Coinbase, Kraken, Gemini, Binance, OKX). If PAXG sources are excluded, the minimum threshold drops from 3 to 2.
+
 ## Repository Structure
 ```
 slo/
