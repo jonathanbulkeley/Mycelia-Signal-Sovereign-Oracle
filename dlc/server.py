@@ -24,6 +24,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dlc.attestor import load_oracle_key, DATA_DIR
 
 app = FastAPI(title="SLO DLC Oracle", version="v1")
+# [PROMETHEUS INSTRUMENTED]
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
 
 
 def _load_json(path):

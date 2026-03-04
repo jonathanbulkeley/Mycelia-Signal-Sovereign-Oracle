@@ -1,0 +1,4 @@
+attestations.db
+attestations.db-wal
+attestations.db-shm
+public/

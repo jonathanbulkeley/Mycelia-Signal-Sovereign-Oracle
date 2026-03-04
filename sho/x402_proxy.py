@@ -457,6 +457,10 @@ async def verify_and_settle_payment(
 # ══════════════════════════════════════════════════════════════════════════════
 
 app = FastAPI(title="SHO — Sovereign HTTP Oracle", version="0.2.1")
+# [PROMETHEUS INSTRUMENTED]
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 
 
 @app.get("/health")
