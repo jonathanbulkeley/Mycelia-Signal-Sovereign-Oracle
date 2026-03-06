@@ -71,7 +71,7 @@ PREVIEW_CACHE_TTL = 300
 def ethusd_preview():
     now = time.time()
     if _preview_cache_ethusd["data"] is None or (now - _preview_cache_ethusd["ts"]) > PREVIEW_CACHE_TTL:
-        price = get_price()
+        price, sources = get_price()
         value = f"{price:.2f}"
         sources = ["binance_us","bitfinex","bitstamp","coinbase","gemini","kraken"]
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
