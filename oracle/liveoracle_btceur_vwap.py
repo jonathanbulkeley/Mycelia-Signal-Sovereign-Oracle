@@ -53,7 +53,7 @@ def btceur_preview():
             "price": value,
             "currency": "EUR",
             "timestamp": ts,
-            "sources": sorted(sources),
+            "sources": sorted(set(sources)),
             "method": "vwap",
             "preview": True,
             "signed": False,

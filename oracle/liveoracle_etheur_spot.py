@@ -53,7 +53,7 @@ def etheur_preview():
             "price": value,
             "currency": "EUR",
             "timestamp": ts,
-            "sources": sorted(sources),
+            "sources": sorted(set(sources)),
             "method": "median",
             "preview": True,
             "signed": False,
