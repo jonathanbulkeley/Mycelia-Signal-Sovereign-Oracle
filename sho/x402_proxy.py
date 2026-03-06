@@ -79,6 +79,17 @@ ROUTES = {
 FREE_ROUTES = {
     "/health":   "http://127.0.0.1:9100/health",
     "/sho/info": None,  # handled internally
+    "/oracle/btcusd/preview":      "http://127.0.0.1:9100/oracle/btcusd/preview",
+    "/oracle/btcusd/vwap/preview": "http://127.0.0.1:9101/oracle/btcusd/vwap/preview",
+    "/oracle/ethusd/preview":      "http://127.0.0.1:9102/oracle/ethusd/preview",
+    "/oracle/eurusd/preview":      "http://127.0.0.1:9103/oracle/eurusd/preview",
+    "/oracle/xauusd/preview":      "http://127.0.0.1:9105/oracle/xauusd/preview",
+    "/oracle/btceur/preview":      "http://127.0.0.1:9106/oracle/btceur/preview",
+    "/oracle/solusd/preview":      "http://127.0.0.1:9107/oracle/solusd/preview",
+    "/oracle/etheur/preview":      "http://127.0.0.1:9108/oracle/etheur/preview",
+    "/oracle/soleur/preview":      "http://127.0.0.1:9109/oracle/soleur/preview",
+    "/oracle/xaueur/preview":      "http://127.0.0.1:9110/oracle/xaueur/preview",
+    "/oracle/btceur/vwap/preview": "http://127.0.0.1:9111/oracle/btceur/vwap/preview",
 }
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -510,7 +521,7 @@ async def main_handler(request: Request, path: str):
         backend = FREE_ROUTES[route_path]
         if backend is None:
             return JSONResponse({"error": "use specific endpoint"}, status_code=404)
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.get(backend)
             return JSONResponse(resp.json())
 
@@ -576,7 +587,7 @@ async def main_handler(request: Request, path: str):
 
     # ── Payment accepted — fetch attestation from backend ──
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.get(route["backend"])
             backend_data = resp.json()
     except Exception as e:
