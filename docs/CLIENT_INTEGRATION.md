@@ -232,7 +232,7 @@ func verifyResponse(resp OracleResponse) bool {
 
 Every response includes a pipe-delimited canonical string:
 ```
-v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|coinbase,kraken,bitstamp|median
+v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|coinbase,kraken,bitstamp|median
 ```
 
 Parse it in any language:
@@ -244,7 +244,7 @@ price     = parts[2]  # "96482.15"
 currency  = parts[3]  # "USD"
 decimals  = parts[4]  # "2"
 timestamp = parts[5]  # "2026-02-13T18:44:30Z"
-nonce     = parts[6]  # "890123"
+nonce     = parts[6]  # "482910" (random 6-digit integer per request)
 sources   = parts[7]  # "coinbase,kraken,bitstamp"
 method    = parts[8]  # "median"
 ```

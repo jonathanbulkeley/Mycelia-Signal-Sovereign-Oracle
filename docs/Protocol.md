@@ -21,7 +21,7 @@ v1|<pair>|<value>|<currency>|<decimals>|<timestamp>|<nonce>|<sources>|<method>
 | currency | string | Quote currency | `USD` |
 | decimals | integer | Decimal precision of value | `2` |
 | timestamp | string | ISO 8601 UTC timestamp | `2026-02-13T18:44:30Z` |
-| nonce | string | Unique identifier per assertion | `890123` |
+| nonce | string | Random 6-digit integer, generated fresh per request | `482910` |
 | sources | string | Comma-separated data sources | `coinbase,kraken,bitstamp` |
 | method | string | Aggregation method | `median` or `vwap` |
 
@@ -36,7 +36,7 @@ v1|<pair>|<value>|<currency>|<decimals>|<timestamp>|<nonce>|<sources>|<method>
 
 ### Example
 ```
-v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|bitstamp,coinbase,kraken|median
+v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|bitstamp,coinbase,kraken|median
 ```
 
 ## Signing Scheme
@@ -45,7 +45,7 @@ v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|bitstamp,coinbase,kraken|me
 
 - Curve: **secp256k1** (same as Bitcoin)
 - Hash: **SHA-256**
-- Signature format: **DER-encoded ECDSA**
+- Signature format: **raw 64-byte (r, s)**
 
 ### Process
 
@@ -78,7 +78,7 @@ Oracles return JSON over HTTP:
 ```json
 {
   "domain": "BTCUSD",
-  "canonical": "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|bitstamp,coinbase,kraken|median",
+  "canonical": "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|bitstamp,coinbase,kraken|median",
   "signature": "MEUCIQDr7y8Hx...",
   "pubkey": "0220a2222aae..."
 }

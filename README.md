@@ -95,7 +95,7 @@ curl https://api.myceliasignal.com/oracle/btcusd
 ```json
 {
   "domain": "BTCUSD",
-  "canonical": "v1|BTCUSD|64179.76|USD|2|2026-02-24T17:48:21Z|890123|binance,...|median",
+  "canonical": "v1|BTCUSD|64179.76|USD|2|2026-02-24T17:48:21Z|482910|binance,...|median",
   "signature": "3yYxQATXEqFgwjzG+CLmzLdlSBODbQc03q2xnu49KU0t...",
   "signing_scheme": "ed25519",
   "pubkey": "c40ad8cbd866189eecb7c68091a984644fb7736ef3b8d96cd31b600ef0072623",
@@ -174,7 +174,7 @@ Client                       L402 Proxy                      Oracle (FastAPI)
 ```json
 {
   "domain": "BTCUSD",
-  "canonical": "v1|BTCUSD|69005.00|USD|2|2026-02-15T17:55:46Z|890123|binance,binance_us,bitfinex,bitstamp,coinbase,gateio,gemini,kraken,okx|median",
+  "canonical": "v1|BTCUSD|69005.00|USD|2|2026-02-15T17:55:46Z|482910|binance,binance_us,bitfinex,bitstamp,coinbase,gateio,gemini,kraken,okx|median",
   "signature": "Fc9m9prAixo1DeZh1xNwkzSXD0zLw6BNlTutaBj/03F7...",
   "pubkey": "02b9b8ec862ee9ca1ab6293f67c473b327a45ed0988d..."
 }

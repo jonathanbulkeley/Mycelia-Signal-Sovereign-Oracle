@@ -57,7 +57,7 @@ After payment, the oracle returns:
 ```json
 {
   "domain": "BTCUSD",
-  "canonical": "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|coinbase,kraken,bitstamp|median",
+  "canonical": "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|coinbase,kraken,bitstamp|median",
   "signature": "MEUCIQDr7y8Hx...",
   "pubkey": "0220a2222aae..."
 }
@@ -65,7 +65,7 @@ After payment, the oracle returns:
 
 #### Reading the canonical message
 ```
-v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|coinbase,kraken,bitstamp|median
+v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|coinbase,kraken,bitstamp|median
 │  │      │        │  │ │                      │      │                        │
 │  │      │        │  │ │                      │      │                        └─ method: median
 │  │      │        │  │ │                      │      └─ sources: coinbase, kraken, bitstamp
@@ -85,7 +85,7 @@ The response is self-verifying. No trust in the transport required.
 import hashlib, base64
 from ecdsa import VerifyingKey, SECP256k1
 
-canonical = "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|coinbase,kraken,bitstamp|median"
+canonical = "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|coinbase,kraken,bitstamp|median"
 signature = "MEUCIQDr7y8Hx..."  # from response
 pubkey = "0220a2222aae..."       # from response
 
@@ -181,7 +181,7 @@ curl -H 'X-PAYMENT: <base64-encoded PaymentPayload>' \
 ```json
 {
   "domain": "BTCUSD",
-  "canonical": "v1|BTCUSD|64179.76|USD|2|2026-02-24T17:48:21Z|890123|binance,...|median",
+  "canonical": "v1|BTCUSD|64179.76|USD|2|2026-02-24T17:48:21Z|482910|binance,...|median",
   "signature": "3yYxQATXEqFgwjzG+CLmzLdlSBODbQc03q2xnu49KU0t...",
   "signing_scheme": "ed25519",
   "pubkey": "c40ad8cbd866189eecb7c68091a984644fb7736ef3b8d96cd31b600ef0072623",
@@ -195,7 +195,7 @@ curl -H 'X-PAYMENT: <base64-encoded PaymentPayload>' \
 import hashlib, base64
 from nacl.signing import VerifyKey
 
-canonical = "v1|BTCUSD|64179.76|USD|2|2026-02-24T17:48:21Z|890123|binance,...|median"
+canonical = "v1|BTCUSD|64179.76|USD|2|2026-02-24T17:48:21Z|482910|binance,...|median"
 signature = "3yYxQATXEqFgwjzG+CLmzLdlSBODbQc03q2xnu49KU0t..."
 pubkey = "c40ad8cbd866189eecb7c68091a984644fb7736ef3b8d96cd31b600ef0072623"
 
