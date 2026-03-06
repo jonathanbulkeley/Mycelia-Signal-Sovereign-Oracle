@@ -3,7 +3,8 @@ Live XAUUSD Spot Oracle (Median of up to 8 sources)
 Tier 1: Kitco, JM Bullion, GoldBroker
 Tier 2: PAXG on Coinbase, Kraken, Gemini, Binance, OKX
 """
-import hashlib, base64, sys
+import hashlib, base64, sys, time
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import FastAPI
@@ -16,6 +17,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from oracle.feeds.xauusd import get_xauusd_price
 
 app = FastAPI()
+# [PROMETHEUS INSTRUMENTED]
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 
 # Key loaded from oracle/keys/ (persistent, shared across all backends)
 
@@ -26,7 +31,7 @@ def oracle_xauusd():
     value = f"{result['price']:.2f}"
     sources = result["sources"]
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    canonical = f"v1|XAUUSD|{value}|USD|2|{ts}|890123|{','.join(sorted(sources))}|median"
+    canonical = f"v1|XAUUSD|{value}|USD|2|{ts}|{secrets.randbelow(900000) + 100000}|{','.join(sorted(sources))}|median"
     h = hashlib.sha256(canonical.encode()).digest()
     sig = PRIVATE_KEY.sign_digest(h)
     return JSONResponse({
@@ -36,6 +41,33 @@ def oracle_xauusd():
         "pubkey": PUBLIC_KEY.to_string("compressed").hex(),
     })
 
+
+
+# Preview cache
+_preview_cache_xauusd = {"data": None, "ts": 0.0}
+PREVIEW_CACHE_TTL = 300
+
+@app.get("/oracle/xauusd/preview")
+def xauusd_preview():
+    now = time.time()
+    if _preview_cache_xauusd["data"] is None or (now - _preview_cache_xauusd["ts"]) > PREVIEW_CACHE_TTL:
+        result = get_xauusd_price()
+        value = f"{result['price']:.2f}"
+        sources = result["sources"]
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _preview_cache_xauusd["data"] = {
+            "pair": "XAUUSD",
+            "price": value,
+            "currency": "USD",
+            "timestamp": ts,
+            "sources": sorted(sources),
+            "method": "median",
+            "preview": True,
+            "signed": False,
+            "note": "Preview mode — data up to 5 minutes stale, no cryptographic signature. Set MYCELIA_WALLET_PRIVATE_KEY for signed real-time attestations via x402."
+        }
+        _preview_cache_xauusd["ts"] = now
+    return JSONResponse(_preview_cache_xauusd["data"])
 
 @app.get("/health")
 def health():

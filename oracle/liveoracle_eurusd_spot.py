@@ -13,6 +13,8 @@ SLO v1 — L402-gated via Aperture
 """
 
 import hashlib
+import secrets
+import time
 import base64
 import sys
 import re
@@ -32,6 +34,9 @@ app = FastAPI(
     title="SLO EURUSD Spot Oracle",
     description="L402-gated EURUSD price oracle (sits behind Aperture)",
 )
+# [PROMETHEUS INSTRUMENTED]
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
 
 
 def fetch_ecb():
@@ -173,9 +178,9 @@ def oracle_eurusd():
     value_raw, sources = get_price()
     value = f"{value_raw:.5f}"
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    source_str = ",".join(sources)
+    source_str = ",".join(sorted(sources))
     canonical = (
-        f"v1|EURUSD|{value}|USD|5|{ts}|901234|{source_str}|median"
+        f"v1|EURUSD|{value}|USD|5|{ts}|{secrets.randbelow(900000) + 100000}|{source_str}|median"
     )
     h = hashlib.sha256(canonical.encode()).digest()
     sig = PRIVATE_KEY.sign_digest(h)
@@ -189,6 +194,32 @@ def oracle_eurusd():
         }
     )
 
+
+
+# Preview cache
+_preview_cache_eurusd = {"data": None, "ts": 0.0}
+PREVIEW_CACHE_TTL = 300
+
+@app.get("/oracle/eurusd/preview")
+def eurusd_preview():
+    now = time.time()
+    if _preview_cache_eurusd["data"] is None or (now - _preview_cache_eurusd["ts"]) > PREVIEW_CACHE_TTL:
+        price, sources = get_price()
+        value = f"{price:.5f}"
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _preview_cache_eurusd["data"] = {
+            "pair": "EURUSD",
+            "price": value,
+            "currency": "USD",
+            "timestamp": ts,
+            "sources": sorted(sources),
+            "method": "median",
+            "preview": True,
+            "signed": False,
+            "note": "Preview mode — data up to 5 minutes stale, no cryptographic signature. Set MYCELIA_WALLET_PRIVATE_KEY for signed real-time attestations via x402."
+        }
+        _preview_cache_eurusd["ts"] = now
+    return JSONResponse(_preview_cache_eurusd["data"])
 
 @app.get("/health")
 def health():
