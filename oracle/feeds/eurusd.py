@@ -102,7 +102,7 @@ def fetch_bitstamp():
 
 SOURCES = [
     ("ecb", fetch_ecb),
-    ("ecb_direct", fetch_ecb_direct),
+    ("ecbdirect", fetch_ecb_direct),
     ("bankofcanada", fetch_bank_of_canada),
     ("rba", fetch_rba),
     ("norgesbank", fetch_norges_bank),
