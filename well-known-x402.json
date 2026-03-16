@@ -1,220 +1,62 @@
 {
-  "x402Version": 1,
-  "facilitator": "https://api.cdp.coinbase.com/platform/v2/x402",
+  "version": "1.0",
+  "updated": "2026-03-15",
   "endpoints": [
-    {
-      "resource": "https://api.myceliasignal.com/oracle/btcusd",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "BTC/USD spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/btcusd/vwap",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "2000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "BTC/USD VWAP \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/ethusd",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "ETH/USD spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/eurusd",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "EUR/USD spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/xauusd",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "XAU/USD spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/btceur",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "BTC/EUR spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/solusd",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "SOL/USD spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/etheur",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "ETH/EUR spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/soleur",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "SOL/EUR spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/xaueur",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "1000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "XAU/EUR spot price \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    },
-    {
-      "resource": "https://api.myceliasignal.com/oracle/btceur/vwap",
-      "accepts": [
-        {
-          "scheme": "exact",
-          "network": "eip155:8453",
-          "maxAmountRequired": "2000",
-          "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          "maxTimeoutSeconds": 60,
-          "extra": {
-            "name": "USD Coin",
-            "version": "2"
-          }
-        }
-      ],
-      "description": "BTC/EUR VWAP \u2014 Ed25519-signed attestation",
-      "mimeType": "application/json"
-    }
-  ],
-  "provider": {
-    "name": "Mycelia Signal",
-    "url": "https://myceliasignal.com",
-    "github": "https://github.com/jonathanbulkeley/mycelia-signal-sovereign-oracle"
-  }
+    {"url": "/oracle/price/btc/usd", "method": "GET", "description": "BTC/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/btc/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/btc/usd/vwap", "method": "GET", "description": "BTC/USD VWAP", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "2000", "resource": "https://api.myceliasignal.com/oracle/price/btc/usd/vwap", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eth/usd", "method": "GET", "description": "ETH/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eth/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eth/eur", "method": "GET", "description": "ETH/EUR spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eth/eur", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eth/jpy", "method": "GET", "description": "ETH/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eth/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/sol/usd", "method": "GET", "description": "SOL/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/sol/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/sol/eur", "method": "GET", "description": "SOL/EUR spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/sol/eur", "mimeType": "application/json"}},
+    {"url": "/oracle/price/sol/jpy", "method": "GET", "description": "SOL/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/sol/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/xau/usd", "method": "GET", "description": "XAU/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/xau/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/xau/eur", "method": "GET", "description": "XAU/EUR spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/xau/eur", "mimeType": "application/json"}},
+    {"url": "/oracle/price/xau/jpy", "method": "GET", "description": "XAU/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/xau/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/btc/eur", "method": "GET", "description": "BTC/EUR spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/btc/eur", "mimeType": "application/json"}},
+    {"url": "/oracle/price/btc/eur/vwap", "method": "GET", "description": "BTC/EUR VWAP", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "2000", "resource": "https://api.myceliasignal.com/oracle/price/btc/eur/vwap", "mimeType": "application/json"}},
+    {"url": "/oracle/price/btc/jpy", "method": "GET", "description": "BTC/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/btc/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eur/usd", "method": "GET", "description": "EUR/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eur/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eur/jpy", "method": "GET", "description": "EUR/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eur/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eur/gbp", "method": "GET", "description": "EUR/GBP spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eur/gbp", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eur/chf", "method": "GET", "description": "EUR/CHF spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eur/chf", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eur/cny", "method": "GET", "description": "EUR/CNY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eur/cny", "mimeType": "application/json"}},
+    {"url": "/oracle/price/eur/cad", "method": "GET", "description": "EUR/CAD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/eur/cad", "mimeType": "application/json"}},
+    {"url": "/oracle/price/gbp/usd", "method": "GET", "description": "GBP/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/gbp/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/gbp/jpy", "method": "GET", "description": "GBP/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/gbp/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/gbp/chf", "method": "GET", "description": "GBP/CHF spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/gbp/chf", "mimeType": "application/json"}},
+    {"url": "/oracle/price/gbp/cny", "method": "GET", "description": "GBP/CNY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/gbp/cny", "mimeType": "application/json"}},
+    {"url": "/oracle/price/gbp/cad", "method": "GET", "description": "GBP/CAD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/gbp/cad", "mimeType": "application/json"}},
+    {"url": "/oracle/price/usd/jpy", "method": "GET", "description": "USD/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/usd/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/usd/chf", "method": "GET", "description": "USD/CHF spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/usd/chf", "mimeType": "application/json"}},
+    {"url": "/oracle/price/usd/cny", "method": "GET", "description": "USD/CNY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/usd/cny", "mimeType": "application/json"}},
+    {"url": "/oracle/price/usd/cad", "method": "GET", "description": "USD/CAD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/usd/cad", "mimeType": "application/json"}},
+    {"url": "/oracle/price/xrp/usd", "method": "GET", "description": "XRP/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/xrp/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/ada/usd", "method": "GET", "description": "ADA/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/ada/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/doge/usd", "method": "GET", "description": "DOGE/USD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/doge/usd", "mimeType": "application/json"}},
+    {"url": "/oracle/price/chf/jpy", "method": "GET", "description": "CHF/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/chf/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/chf/cad", "method": "GET", "description": "CHF/CAD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/chf/cad", "mimeType": "application/json"}},
+    {"url": "/oracle/price/cny/jpy", "method": "GET", "description": "CNY/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/cny/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/price/cny/cad", "method": "GET", "description": "CNY/CAD spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/cny/cad", "mimeType": "application/json"}},
+    {"url": "/oracle/price/cad/jpy", "method": "GET", "description": "CAD/JPY spot", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "1000", "resource": "https://api.myceliasignal.com/oracle/price/cad/jpy", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/cpi", "method": "GET", "description": "US CPI", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/cpi", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/cpi_core", "method": "GET", "description": "US CPI Core", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/cpi_core", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/unrate", "method": "GET", "description": "US Unemployment Rate", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/unrate", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/fedfunds", "method": "GET", "description": "US Fed Funds Rate", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/fedfunds", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/nfp", "method": "GET", "description": "US Nonfarm Payrolls", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/nfp", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/gdp", "method": "GET", "description": "US GDP", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/gdp", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/pce", "method": "GET", "description": "US PCE", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/pce", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/us/yield_curve", "method": "GET", "description": "US Yield Curve", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/us/yield_curve", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/eu/hicp", "method": "GET", "description": "EU HICP", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/eu/hicp", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/eu/hicp_core", "method": "GET", "description": "EU HICP Core", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/eu/hicp_core", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/eu/hicp_services", "method": "GET", "description": "EU HICP Services", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/eu/hicp_services", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/eu/unrate", "method": "GET", "description": "EU Unemployment Rate", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/eu/unrate", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/eu/gdp", "method": "GET", "description": "EU GDP", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/eu/gdp", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/eu/employment", "method": "GET", "description": "EU Employment", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/eu/employment", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/commodities/wti", "method": "GET", "description": "WTI Crude Oil", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/commodities/wti", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/commodities/brent", "method": "GET", "description": "Brent Crude Oil", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/commodities/brent", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/commodities/natgas", "method": "GET", "description": "Natural Gas", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/commodities/natgas", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/commodities/copper", "method": "GET", "description": "Copper", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/commodities/copper", "mimeType": "application/json"}},
+    {"url": "/oracle/econ/commodities/dxy", "method": "GET", "description": "US Dollar Index", "paymentRequirements": {"scheme": "exact", "network": "base", "maxAmountRequired": "10000", "resource": "https://api.myceliasignal.com/oracle/econ/commodities/dxy", "mimeType": "application/json"}}
+  ]
 }
