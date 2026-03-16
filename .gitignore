@@ -1,18 +1,21 @@
-# Private keys
-oracle/keys/*.key
-sho/keys/
-dlc/keys/
-
-# Data
-dlc/data/
+# Databases
+*.db
+*.db-shm
+*.db-wal
 
 # Python
 __pycache__/
-sho/venv/
+*.pyc
+*.pyo
+*.pyd
 
 # Compiled binaries
-l402-proxy/slo-l402-proxy
+*.exe
+*.bin
 
-# Backups and temp files
-*.bak*
-update_docs.sh
+# Keys and credentials — never commit
+keys/
+creds/
+*.key
+*.pem
+*.macaroon
