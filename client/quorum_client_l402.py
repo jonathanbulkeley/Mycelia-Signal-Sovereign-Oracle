@@ -1,23 +1,21 @@
 """
-SLO Paid Oracle Client v1 — L402 Integration
-- Pays oracles via L402 (Lightning) using lnget or Python fallback
-- Enforces availability quorum
-- Verifies oracle signatures
-- Enforces price coherence
-- Aggregates via median
+Mycelia Signal Quorum Client — L402 (Lightning)
+
+Queries multiple Mycelia Signal oracle endpoints, verifies signatures,
+enforces price coherence, and returns a quorum-validated median price.
 
 Payment flow:
-  1. Client sends GET to Aperture-fronted oracle endpoint
-  2. Aperture returns HTTP 402 + Lightning invoice + macaroon
-  3. Client pays invoice via Lightning, obtains preimage
-  4. Client retries request with L402 token
-  5. Oracle returns signed price assertion
+  1. Client sends GET to L402-gated endpoint
+  2. Server returns HTTP 402 + Lightning invoice + macaroon
+  3. Client pays invoice via lnget (automatic) or manual wallet
+  4. Client retries with Authorization: L402 <macaroon>:<preimage>
+  5. Oracle returns signed attestation
 
-Two payment backends are supported:
-  A) lnget (preferred) — Lightning Labs CLI tool, handles L402 transparently
-  B) Python L402 wrapper — uses RequestsL402Wrapper from LangChainBitcoin
-
-Configure via PAYMENT_BACKEND below or --backend flag.
+Usage:
+  python quorum_client_l402.py
+  python quorum_client_l402.py --pair EURUSD
+  python quorum_client_l402.py --pair BTCUSD --backend lnget
+  python quorum_client_l402.py --oracles https://api.myceliasignal.com/oracle/price/btc/usd https://api.myceliasignal.com/oracle/price/btc/usd/vwap
 """
 
 import argparse
@@ -30,31 +28,50 @@ import sys
 from dataclasses import dataclass
 from typing import Optional
 
-from ecdsa import SECP256k1, VerifyingKey
-
 # -------------------------
 # Configuration
 # -------------------------
-# These now point to the Aperture public proxy, NOT the oracle directly.
-# Aperture handles L402 negotiation and proxies to the backend oracle.
-ORACLES = [
-    "http://127.0.0.1:8080/oracle/btcusd",  # Aperture -> oracle on :9100
-    "http://127.0.0.1:8081/oracle/btcusd",  # Aperture -> oracle on :9101
-    "http://127.0.0.1:8082/oracle/btcusd",  # Aperture -> oracle on :9102
-]
 
-# Expected public keys for each oracle (explicit trust per SLO protocol).
-# In production, populate these from your config. Empty = skip pubkey check.
-EXPECTED_PUBKEYS = {
-    # "http://127.0.0.1:8080/oracle/btcusd": "02abcdef...",
+# Default oracle set — spot + VWAP for quorum
+ORACLE_SETS = {
+    "BTCUSD": [
+        "https://api.myceliasignal.com/oracle/price/btc/usd",
+        "https://api.myceliasignal.com/oracle/price/btc/usd/vwap",
+    ],
+    "BTCEUR": [
+        "https://api.myceliasignal.com/oracle/price/btc/eur",
+        "https://api.myceliasignal.com/oracle/price/btc/eur/vwap",
+    ],
+    "ETHUSD": [
+        "https://api.myceliasignal.com/oracle/price/eth/usd",
+    ],
+    "EURUSD": [
+        "https://api.myceliasignal.com/oracle/price/eur/usd",
+    ],
+    "XAUUSD": [
+        "https://api.myceliasignal.com/oracle/price/xau/usd",
+    ],
 }
 
-MIN_RESPONSES = 2
-MAX_DEVIATION_PCT = 0.5  # percent allowed deviation from median
+# Expected public keys per node — pin for identity verification
+# US GC secp256k1 pubkey
+EXPECTED_PUBKEYS = {
+    "https://api.myceliasignal.com/oracle/price/btc/usd":      "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+    "https://api.myceliasignal.com/oracle/price/btc/usd/vwap": "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+    "https://api.myceliasignal.com/oracle/price/btc/eur":      "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+    "https://api.myceliasignal.com/oracle/price/btc/eur/vwap": "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+    "https://api.myceliasignal.com/oracle/price/eth/usd":      "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+    "https://api.myceliasignal.com/oracle/price/eur/usd":      "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+    "https://api.myceliasignal.com/oracle/price/xau/usd":      "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+}
+
+MIN_RESPONSES    = 2
+MAX_DEVIATION_PCT = 0.5   # percent allowed deviation from median
+MAX_STALENESS_SEC = 300   # max age of response in seconds
 
 # lnget configuration
-LNGET_BIN = "lnget"  # Path to lnget binary
-LNGET_MAX_COST = 100  # Max sats per request (safety cap)
+LNGET_BIN      = "lnget"
+LNGET_MAX_COST = 100   # max sats per request (safety cap)
 
 
 # -------------------------
@@ -62,12 +79,11 @@ LNGET_MAX_COST = 100  # Max sats per request (safety cap)
 # -------------------------
 @dataclass
 class OracleResponse:
-    url: str
+    url:       str
     canonical: str
-    price: float
-    signature: bytes
+    price:     float
     pubkey_hex: str
-    valid: bool
+    valid:     bool
 
 
 # -------------------------
@@ -76,102 +92,62 @@ class OracleResponse:
 def fetch_via_lnget(url: str, max_cost: int = LNGET_MAX_COST) -> Optional[dict]:
     """
     Use lnget (Lightning Labs CLI) to fetch an L402-gated resource.
-
-    lnget handles the full L402 flow transparently:
-      - Sends initial GET
-      - Receives 402 + invoice + macaroon
-      - Pays invoice via connected LND node
-      - Retries with L402 token
-      - Returns the final response body
-
-    --max-cost sets a per-request spending ceiling in sats.
+    lnget handles the full L402 flow transparently.
+    Install: go install github.com/lightninglabs/lnget@latest
     """
     try:
         result = subprocess.run(
-            [
-                LNGET_BIN,
-                "--max-cost", str(max_cost),
-                "--output", "-",  # stdout
-                url,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
+            [LNGET_BIN, "-k", "-q", url],
+            capture_output=True, text=True, timeout=60
         )
         if result.returncode != 0:
             raise RuntimeError(f"lnget failed: {result.stderr.strip()}")
         return json.loads(result.stdout)
     except FileNotFoundError:
         raise RuntimeError(
-            f"lnget not found at '{LNGET_BIN}'. Install from: "
-            "github.com/lightninglabs/lightning-agent-tools"
+            f"lnget not found at '{LNGET_BIN}'. "
+            "Install: go install github.com/lightninglabs/lnget@latest"
         )
 
 
-def fetch_via_python_l402(url: str) -> Optional[dict]:
+def fetch_via_manual(url: str) -> Optional[dict]:
     """
-    Fallback: Use LangChainBitcoin's RequestsL402Wrapper.
-
-    Requires:
-      pip install LangChainBitcoin
-      LND node accessible via environment config.
-
-    The wrapper intercepts 402 responses, pays the Lightning invoice
-    using the configured LND node, and retries with the L402 token.
+    Manual L402 flow using Python requests.
+    Requires: LIGHTNING_PREIMAGE env var set to preimage for the current invoice.
+    For automated use, implement pay_invoice() with your LND node.
     """
-    try:
-        from lnurl import LndNode  # noqa
-        from l402_wrapper import RequestsL402Wrapper  # noqa
-    except ImportError:
-        raise RuntimeError(
-            "Python L402 fallback requires LangChainBitcoin. Install:\n"
-            "  git clone https://github.com/lightninglabs/LangChainBitcoin.git\n"
-            "  cd LangChainBitcoin && pip install -e ."
-        )
-
-    # Initialize LND connection from environment
-    # Expects: LND_HOST, LND_MACAROON_PATH, LND_CERT_PATH
     import os
-
-    lnd = LndNode(
-        host=os.environ.get("LND_HOST", "localhost:10009"),
-        macaroon_path=os.environ.get("LND_MACAROON_PATH", ""),
-        cert_path=os.environ.get("LND_CERT_PATH", ""),
-    )
-    wrapper = RequestsL402Wrapper(lnd_node=lnd)
-    response = wrapper.get(url, timeout=15)
-    response.raise_for_status()
-    return response.json()
-
-
-def fetch_via_simulated(url: str) -> Optional[dict]:
-    """
-    Local simulation fallback for testing without Lightning.
-
-    This reproduces the original 3-step flow (quote/pay/paid) for use
-    with the non-Aperture version of the oracle. Useful for local dev
-    before you have LND + Aperture running.
-    """
+    import re
     import requests
 
-    # Derive base URL from the oracle URL
-    # e.g., http://127.0.0.1:8080/oracle/btcusd -> http://127.0.0.1:8080
-    from urllib.parse import urlparse
+    r = requests.get(url, timeout=30)
+    if r.status_code != 402:
+        return r.json()
 
-    parsed = urlparse(url)
-    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    auth = r.headers.get("Www-Authenticate", "")
+    macaroon_match = re.search(r'macaroon="([^"]+)"', auth)
+    invoice_match  = re.search(r'invoice="([^"]+)"', auth)
 
-    quote = requests.get(f"{base_url}/quote", timeout=5).json()
-    invoice_id = quote["invoice_id"]
-    requests.post(f"{base_url}/pay/{invoice_id}", timeout=5)
-    data = requests.get(f"{base_url}/paid/{invoice_id}", timeout=5).json()
-    return data
+    if not macaroon_match or not invoice_match:
+        raise RuntimeError("Could not parse L402 challenge")
+
+    macaroon = macaroon_match.group(1)
+    invoice  = invoice_match.group(1)
+
+    print(f"  Invoice: {invoice}")
+    print(f"  Pay the invoice and press Enter, or set LIGHTNING_PREIMAGE env var.")
+
+    preimage = os.environ.get("LIGHTNING_PREIMAGE") or input("  Preimage (hex): ").strip()
+
+    r2 = requests.get(url, headers={"Authorization": f"L402 {macaroon}:{preimage}"}, timeout=30)
+    if r2.status_code != 200:
+        raise RuntimeError(f"L402 retry failed: {r2.status_code}")
+    return r2.json()
 
 
 BACKENDS = {
-    "lnget": fetch_via_lnget,
-    "python-l402": fetch_via_python_l402,
-    "simulated": fetch_via_simulated,
+    "lnget":  fetch_via_lnget,
+    "manual": fetch_via_manual,
 }
 
 
@@ -182,34 +158,66 @@ def pct_diff(a, b):
     return abs(a - b) / b * 100
 
 
+def get_canonical(data: dict) -> str:
+    """Get canonical string — handles both field names."""
+    return data.get("canonical") or data.get("canonicalstring", "")
+
+
+def parse_price_from_canonical(canonical: str) -> float:
+    """Parse price from canonical string. Handles PRICE type."""
+    parts = canonical.split("|")
+    if len(parts) < 4:
+        raise ValueError(f"Cannot parse canonical: {canonical}")
+    msg_type = parts[1]
+    if msg_type == "PRICE":
+        return float(parts[3])
+    else:
+        # Econ/commodities — value at index 3
+        return float(parts[3])
+
+
 def verify_oracle_response(data: dict, url: str) -> OracleResponse:
-    """Verify signature and parse canonical message per SLO v1 Protocol."""
-    canonical = data["canonical"]
-    signature = base64.b64decode(data["signature"])
-    pubkey_hex = data["pubkey"]
+    """Verify secp256k1 signature and parse canonical message."""
+    try:
+        from coincurve import PublicKey
+    except ImportError:
+        raise RuntimeError(
+            "coincurve required. Install: pip install coincurve"
+        )
+
+    canonical  = get_canonical(data)
+    pubkey_hex = data.get("pubkey", "")
+    sig_b64    = data.get("signature", "")
+
+    if not canonical or not pubkey_hex or not sig_b64:
+        return OracleResponse(url=url, canonical=canonical, price=0.0,
+                               pubkey_hex=pubkey_hex, valid=False)
 
     # Verify signature
-    message_hash = hashlib.sha256(canonical.encode("utf-8")).digest()
-    vk = VerifyingKey.from_string(bytes.fromhex(pubkey_hex), curve=SECP256k1)
     valid = False
     try:
-        valid = vk.verify_digest(signature, message_hash)
+        msg_hash = hashlib.sha256(canonical.encode("utf-8")).digest()
+        pubkey   = PublicKey(bytes.fromhex(pubkey_hex))
+        sig      = base64.b64decode(sig_b64)
+        valid    = pubkey.verify(sig, msg_hash, hasher=None)
     except Exception:
         valid = False
 
     # Verify pubkey matches expected (if configured)
-    if url in EXPECTED_PUBKEYS:
-        if pubkey_hex != EXPECTED_PUBKEYS[url]:
-            valid = False
+    expected = EXPECTED_PUBKEYS.get(url)
+    if expected and pubkey_hex != expected:
+        valid = False
 
-    # Parse price from canonical: v1|BTCUSD|<price>|USD|...
-    price = float(canonical.split("|")[2])
+    price = 0.0
+    try:
+        price = parse_price_from_canonical(canonical)
+    except Exception:
+        valid = False
 
     return OracleResponse(
         url=url,
         canonical=canonical,
         price=price,
-        signature=signature,
         pubkey_hex=pubkey_hex,
         valid=valid,
     )
@@ -218,9 +226,19 @@ def verify_oracle_response(data: dict, url: str) -> OracleResponse:
 # -------------------------
 # Client execution
 # -------------------------
-def run_quorum_client(backend_name: str = "lnget", oracles: list = None):
+def run_quorum_client(
+    pair: str = "BTCUSD",
+    backend_name: str = "lnget",
+    oracles: list = None,
+):
+    pair = pair.upper()
     if oracles is None:
-        oracles = ORACLES
+        oracles = ORACLE_SETS.get(pair)
+        if not oracles:
+            raise ValueError(
+                f"Unknown pair '{pair}'. Available: {list(ORACLE_SETS.keys())}\n"
+                f"Or pass --oracles with explicit URLs."
+            )
 
     fetch_fn = BACKENDS.get(backend_name)
     if not fetch_fn:
@@ -229,25 +247,23 @@ def run_quorum_client(backend_name: str = "lnget", oracles: list = None):
         )
 
     prices = []
-    valid_oracles = 0
+    valid_count = 0
 
     print("=" * 80)
-    print(f"SLO PAID ORACLE CLIENT v1 (L402 — backend: {backend_name})")
+    print(f"MYCELIA SIGNAL QUORUM CLIENT — {pair} (backend: {backend_name})")
     print("=" * 80)
 
     for i, url in enumerate(oracles, start=1):
         print(f"\n[Oracle {i}] {url}")
 
         try:
-            # Single call — L402 payment handled by backend
-            print(f"  Fetching (L402 payment handled by {backend_name})...")
+            print(f"  Fetching...")
             data = fetch_fn(url)
 
-            if "error" in data:
-                print(f"  ✗ Oracle error: {data['error']}")
+            if not data or "error" in data:
+                print(f"  ✗ Oracle error: {data.get('error') if data else 'no data'}")
                 continue
 
-            # Verify signature and parse response
             result = verify_oracle_response(data, url)
 
             if not result.valid:
@@ -255,9 +271,10 @@ def run_quorum_client(backend_name: str = "lnget", oracles: list = None):
                 continue
 
             prices.append(result.price)
-            valid_oracles += 1
+            valid_count += 1
             print(f"  Canonical: {result.canonical}")
             print(f"  Pubkey:    {result.pubkey_hex[:16]}...")
+            print(f"  Price:     {result.price}")
             print("  ✓ Signature: VALID")
 
         except Exception as e:
@@ -266,28 +283,23 @@ def run_quorum_client(backend_name: str = "lnget", oracles: list = None):
     # -------------------------
     # Quorum enforcement
     # -------------------------
-    if valid_oracles < MIN_RESPONSES:
-        raise RuntimeError(
-            f"Availability quorum not met: {valid_oracles}/{len(oracles)}"
-        )
+    if valid_count < MIN_RESPONSES:
+        print(f"\n✗ Quorum not met: {valid_count}/{len(oracles)} valid responses (need {MIN_RESPONSES})")
+        sys.exit(1)
 
     median_price = statistics.median(prices)
+
     for p in prices:
         if pct_diff(p, median_price) > MAX_DEVIATION_PCT:
-            raise RuntimeError(
-                f"Price coherence failure: {p} deviates > {MAX_DEVIATION_PCT}% "
-                f"from median {median_price}"
-            )
+            print(f"\n✗ Coherence failure: {p} deviates >{MAX_DEVIATION_PCT}% from median {median_price}")
+            sys.exit(1)
 
-    # -------------------------
-    # Final output
-    # -------------------------
     print("\n" + "=" * 80)
-    print(f"AGGREGATED PRICE (median): ${median_price:,.2f}")
-    print(
-        f"Quorum satisfied: {valid_oracles} responses within "
-        f"{MAX_DEVIATION_PCT}% deviation"
-    )
+    print(f"QUORUM RESULT")
+    print(f"  Pair:     {pair}")
+    print(f"  Median:   {median_price:,.4f}")
+    print(f"  Prices:   {prices}")
+    print(f"  Oracles:  {valid_count}/{len(oracles)} valid")
     print("=" * 80)
 
     return median_price
@@ -297,31 +309,28 @@ def run_quorum_client(backend_name: str = "lnget", oracles: list = None):
 # CLI
 # -------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="SLO Quorum Client (L402)")
+    parser = argparse.ArgumentParser(description="Mycelia Signal Quorum Client (L402)")
+    parser.add_argument(
+        "--pair",
+        default="BTCUSD",
+        help="Trading pair to query (default: BTCUSD)"
+    )
     parser.add_argument(
         "--backend",
         choices=list(BACKENDS.keys()),
         default="lnget",
-        help="Payment backend (default: lnget)",
+        help="Payment backend (default: lnget)"
     )
     parser.add_argument(
         "--oracles",
         nargs="+",
         default=None,
-        help="Override oracle URLs (space-separated)",
-    )
-    parser.add_argument(
-        "--max-cost",
-        type=int,
-        default=LNGET_MAX_COST,
-        help="Max sats per request for lnget (default: 100)",
+        help="Override oracle URLs (space-separated)"
     )
     args = parser.parse_args()
 
-    if args.max_cost != LNGET_MAX_COST:
-        LNGET_MAX_COST = args.max_cost
-
     run_quorum_client(
+        pair=args.pair,
         backend_name=args.backend,
         oracles=args.oracles,
     )
