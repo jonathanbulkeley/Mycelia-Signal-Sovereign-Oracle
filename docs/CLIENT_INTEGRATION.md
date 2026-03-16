@@ -24,12 +24,10 @@ lnget config init
 # Edit ~/.lnget/config.yaml with your LND credentials
 
 # Fetch signed price data
-lnget -k -q https://api.myceliasignal.com/oracle/btcusd | jq .
+lnget -k -q http://104.197.109.246:8080/oracle/btcusd | jq .
 ```
 
 lnget caches L402 tokens, so repeated requests to the same endpoint reuse the token until it expires.
-
-**Note:** Go's default TLS ClientHello is fingerprinted and rejected by Cloudflare's bot protection. If you experience 400 errors with lnget through the HTTPS domain, use the VM's direct IP as a workaround or configure a custom TLS profile. `curl` and Python `urllib` work fine through Cloudflare.
 
 ## Python Integration
 
@@ -49,7 +47,7 @@ def fetch_oracle(url: str) -> dict:
         raise RuntimeError(f"lnget failed: {result.stderr.strip()}")
     return json.loads(result.stdout)
 
-data = fetch_oracle("https://api.myceliasignal.com/oracle/btcusd")
+data = fetch_oracle("http://104.197.109.246:8080/oracle/btcusd")
 print(f"BTCUSD: {data['canonical'].split('|')[2]}")
 ```
 
@@ -63,7 +61,7 @@ import hashlib
 import base64
 from ecdsa import VerifyingKey, SECP256k1
 
-ORACLE_URL = "https://api.myceliasignal.com/oracle/btcusd"
+ORACLE_URL = "http://104.197.109.246:8080/oracle/btcusd"
 
 def fetch_with_l402(url: str, pay_invoice_func) -> dict:
     """
@@ -232,7 +230,7 @@ func verifyResponse(resp OracleResponse) bool {
 
 Every response includes a pipe-delimited canonical string:
 ```
-v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|coinbase,kraken,bitstamp|median
+v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|coinbase,kraken,bitstamp|median
 ```
 
 Parse it in any language:
@@ -244,7 +242,7 @@ price     = parts[2]  # "96482.15"
 currency  = parts[3]  # "USD"
 decimals  = parts[4]  # "2"
 timestamp = parts[5]  # "2026-02-13T18:44:30Z"
-nonce     = parts[6]  # "482910" (random 6-digit integer per request)
+nonce     = parts[6]  # "890123"
 sources   = parts[7]  # "coinbase,kraken,bitstamp"
 method    = parts[8]  # "median"
 ```
@@ -256,8 +254,8 @@ For production use, query multiple oracles and aggregate:
 import statistics
 
 ORACLES = [
-    "https://api.myceliasignal.com/oracle/btcusd",       # 10 sats
-    "https://api.myceliasignal.com/oracle/btcusd/vwap",   # 20 sats
+    "http://104.197.109.246:8080/oracle/btcusd",       # 10 sats
+    "http://104.197.109.246:8080/oracle/btcusd/vwap",   # 20 sats
     # Add third-party SLO operators here as they come online
 ]
 
@@ -293,7 +291,7 @@ The quorum pattern means no single oracle can deceive you. As more operators com
 
 ## Cost Management
 
-- Spot query (BTC, ETH, EUR, XAU, BTC/EUR, SOL, ETH/EUR, SOL/EUR, XAU/EUR): **10 sats** (~$0.007)
+- Spot query (BTC, ETH, EUR, XAU, BTC/EUR, SOL): **10 sats** (~$0.007)
 - VWAP query: **20 sats** (~$0.014)
 - DLC attestation: **1000 sats** (~$0.70)
 - Full quorum (spot + VWAP): **30 sats** (~$0.021)
@@ -311,180 +309,10 @@ lnget caches tokens, so repeated requests within the token validity window don't
 3. **Use quorum.** A single oracle can lie. Two independent oracles lying in the same direction is much harder.
 4. **Check timestamps.** Reject assertions older than your staleness threshold (e.g., 60 seconds).
 5. **Monitor deviation.** If oracles start diverging beyond your threshold, halt and investigate.
-
-## x402 Integration (SHO — USDC on Base)
-SHO provides the same oracle data via the standard x402 payment protocol. Instead of Lightning sats, consumers pay with USDC on Base using EIP-3009 `transferWithAuthorization` signatures — gasless, no on-chain transaction required from the client.
-
-### Quick Start
-```bash
-# Get oracle info (free)
-curl https://api.myceliasignal.com/sho/info
-
-# Get health status (free)
-curl https://api.myceliasignal.com/health
-
-# Request price — returns 402 with standard x402 accepts array
-curl https://api.myceliasignal.com/oracle/btcusd
-
-# Discovery document
-curl https://api.myceliasignal.com/.well-known/x402
 ```
 
-### Standard x402 Clients (Recommended)
+---
 
-Any standard x402 client works out of the box:
-```javascript
-// Using @x402/fetch (Node.js / TypeScript)
-import { fetchWithPayment } from "@x402/fetch";
-import { createWalletClient, http } from "viem";
-import { base } from "viem/chains";
-import { privateKeyToAccount } from "viem/accounts";
-
-const account = privateKeyToAccount("0x...");
-const client = createWalletClient({ account, chain: base, transport: http() });
-
-const response = await fetchWithPayment(
-  "https://api.myceliasignal.com/oracle/btcusd",
-  {}, // fetch options
-  { walletClient: client }
-);
-const data = await response.json();
+Add that to `docs/CLIENT_INTEGRATION.md`. How's the channel looking?
 ```
-
-### Python x402 Client
-```python
-import json
-import hashlib
-import base64
-import secrets
-import time
-import requests
-
-ORACLE_URL = "https://api.myceliasignal.com"
-
-def fetch_x402(pair: str, wallet_address: str, sign_typed_data_fn) -> dict:
-    """Full standard x402 flow: request → sign EIP-712 → retry with X-PAYMENT.
-
-    Args:
-        pair: Trading pair (e.g., "btcusd")
-        wallet_address: Your Ethereum address
-        sign_typed_data_fn: Function that signs EIP-712 typed data
-            signature = sign_typed_data_fn(typed_data: dict) -> str
-    """
-    # Step 1: Get payment requirements
-    r = requests.get(f"{ORACLE_URL}/oracle/{pair}")
-    if r.status_code != 402:
-        return r.json()
-
-    body402 = r.json()
-    req = body402["accepts"][0]
-
-    # Step 2: Build EIP-3009 transferWithAuthorization parameters
-    nonce = "0x" + secrets.token_hex(32)
-    valid_before = str(int(time.time()) + 300)  # 5 minutes
-
-    typed_data = {
-        "types": {
-            "EIP712Domain": [
-                {"name": "name", "type": "string"},
-                {"name": "version", "type": "string"},
-                {"name": "chainId", "type": "uint256"},
-                {"name": "verifyingContract", "type": "address"},
-            ],
-            "TransferWithAuthorization": [
-                {"name": "from", "type": "address"},
-                {"name": "to", "type": "address"},
-                {"name": "value", "type": "uint256"},
-                {"name": "validAfter", "type": "uint256"},
-                {"name": "validBefore", "type": "uint256"},
-                {"name": "nonce", "type": "bytes32"},
-            ],
-        },
-        "primaryType": "TransferWithAuthorization",
-        "domain": {
-            "name": req["extra"]["name"],      # "USD Coin"
-            "version": req["extra"]["version"], # "2"
-            "chainId": 8453,                    # Base mainnet
-            "verifyingContract": req["asset"],
-        },
-        "message": {
-            "from": wallet_address,
-            "to": req["payTo"],
-            "value": req["maxAmountRequired"],
-            "validAfter": "0",
-            "validBefore": valid_before,
-            "nonce": nonce,
-        },
-    }
-
-    # Step 3: Sign (your wallet implementation)
-    signature = sign_typed_data_fn(typed_data)
-
-    # Step 4: Build standard PaymentPayload
-    payment_payload = {
-        "x402Version": 1,
-        "scheme": "exact",
-        "network": "eip155:8453",
-        "payload": {
-            "signature": signature,
-            "authorization": {
-                "from": wallet_address,
-                "to": req["payTo"],
-                "value": req["maxAmountRequired"],
-                "validAfter": "0",
-                "validBefore": valid_before,
-                "nonce": nonce,
-            },
-        },
-    }
-
-    # Step 5: Base64-encode and retry
-    x_payment = base64.b64encode(json.dumps(payment_payload).encode()).decode()
-    r2 = requests.get(
-        f"{ORACLE_URL}/oracle/{pair}",
-        headers={"X-PAYMENT": x_payment},
-    )
-    return r2.json()
-
-
-def verify_ed25519(data: dict) -> bool:
-    """Verify Ed25519 signature on x402 response."""
-    try:
-        from nacl.signing import VerifyKey
-        msg_hash = hashlib.sha256(data["canonical"].encode()).digest()
-        sig = base64.b64decode(data["signature"])
-        vk = VerifyKey(bytes.fromhex(data["pubkey"]))
-        vk.verify(msg_hash, sig)
-        return True
-    except Exception:
-        return False
-```
-
-### x402 Error Handling
-
-| HTTP Status | Meaning | Action |
-|---|---|---|
-| 402 | Payment required | Parse `accepts` array, sign EIP-712, retry with `X-PAYMENT` header |
-| 200 | Success | Verify Ed25519 signature, parse data |
-| 400 | Invalid payment payload or signature | Check payload format matches spec |
-| 403 | Address blocked (enforcement) | Grace cooldown or hard block — check `/sho/enforcement/{address}` |
-| 503 | Depeg circuit breaker active | USDC off peg — try again later or use L402 (Lightning) instead |
-
-### x402 Cost
-
-- Spot query (BTC, ETH, EUR, XAU, BTC/EUR, SOL, ETH/EUR, SOL/EUR, XAU/EUR): **$0.001 USDC**
-- VWAP query: **$0.002 USDC**
-- No gas fee for the client — EIP-3009 signatures are settled by the CDP facilitator
-
-### Choosing Between L402 and x402
-
-| Use L402 (Lightning) when... | Use x402 (USDC) when... |
-|---|---|
-| You already have a Lightning wallet | You already have USDC on Base |
-| You want pseudonymous payments | You want EVM-native integration |
-| You're building on Bitcoin | You're building on Base/EVM |
-| Sub-second payment finality matters | You prefer stablecoin accounting |
-| | Standard x402 SDK clients work out of the box |
-
-Both protocols return the same oracle data with the same canonical format. Only the signature scheme and payment mechanism differ.
-
+curl -k --header "Grpc-Metadata-macaroon: %MAC%" https://mycelia.m.voltageapp.io:8080/v1/channels/pending

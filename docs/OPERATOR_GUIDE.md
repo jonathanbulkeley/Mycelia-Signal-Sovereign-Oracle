@@ -20,7 +20,7 @@ Estimated costs:
 
 ## Architecture
 ```
-Internet → L402 Proxy (:8080) → Oracle backends (:9100-9111)
+Internet → L402 Proxy (:8080) → Oracle backends (:9100-9107)
                  ↕
           Your LND node
           (REST API for invoices)
@@ -35,17 +35,12 @@ SLO runs 8 oracle endpoints on a single GCP VM:
 | Endpoint | Port | Sources | Price |
 |---|---|---|---|
 | BTCUSD spot | 9100 | 9 exchanges (5 USD + 4 USDT) | 10 sats |
-| BTCUSD VWAP | 9101 | 7 sources (5-min window, USDT normalization) | 20 sats |
+| BTCUSD VWAP | 9101 | Coinbase, Kraken trades | 20 sats |
 | ETHUSD spot | 9102 | 5 exchanges | 10 sats |
-| EURUSD spot | 9103 | 6 central banks + 2 exchanges | 10 sats |
+| EURUSD spot | 9103 | 5 central banks + 2 exchanges | 10 sats |
 | DLC attestor | 9104 | Same as BTCUSD (9 sources) | 1000 sats |
 | XAU/USD gold | 9105 | 3 traditional + 5 PAXG exchanges | 10 sats |
 | BTC/EUR cross | 9106 | Derived from BTCUSD + EURUSD | 10 sats |
-| SOL/USD spot | 9107 | 9 exchanges (5 USD + 4 USDT) | 10 sats |
-| ETH/EUR hybrid | 9108 | 3 direct EUR + cross-rate | 10 sats |
-| SOL/EUR hybrid | 9109 | 3 direct EUR + cross-rate | 10 sats |
-| XAU/EUR cross | 9110 | Derived from XAUUSD + EURUSD | 10 sats |
-| BTC/EUR VWAP | 9111 | VWAP cross-rate | 20 sats |
 | SOL/USD spot | 9107 | 9 exchanges (5 USD + 4 USDT) | 10 sats |
 
 ## Step 1: Set Up Your Lightning Node
@@ -73,7 +68,7 @@ sudo apt install -y python3 python3-pip golang-go git
 pip3 install fastapi uvicorn ecdsa requests --break-system-packages
 
 # Clone SLO
-git clone https://github.com/jonathanbulkeley/mycelia-signal-sovereign-oracle.git ~/slo
+git clone https://github.com/jonathanbulkeley/sovereign-lightning-oracle.git ~/slo
 
 # Build the L402 proxy
 mkdir -p ~/slo-l402-proxy

@@ -21,7 +21,7 @@ v1|<pair>|<value>|<currency>|<decimals>|<timestamp>|<nonce>|<sources>|<method>
 | currency | string | Quote currency | `USD` |
 | decimals | integer | Decimal precision of value | `2` |
 | timestamp | string | ISO 8601 UTC timestamp | `2026-02-13T18:44:30Z` |
-| nonce | string | Random 6-digit integer, generated fresh per request | `482910` |
+| nonce | string | Unique identifier per assertion | `890123` |
 | sources | string | Comma-separated data sources | `coinbase,kraken,bitstamp` |
 | method | string | Aggregation method | `median` or `vwap` |
 
@@ -36,7 +36,7 @@ v1|<pair>|<value>|<currency>|<decimals>|<timestamp>|<nonce>|<sources>|<method>
 
 ### Example
 ```
-v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|bitstamp,coinbase,kraken|median
+v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|bitstamp,coinbase,kraken|median
 ```
 
 ## Signing Scheme
@@ -45,7 +45,7 @@ v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|bitstamp,coinbase,kraken|me
 
 - Curve: **secp256k1** (same as Bitcoin)
 - Hash: **SHA-256**
-- Signature format: **raw 64-byte (r, s)**
+- Signature format: **DER-encoded ECDSA**
 
 ### Process
 
@@ -78,7 +78,7 @@ Oracles return JSON over HTTP:
 ```json
 {
   "domain": "BTCUSD",
-  "canonical": "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|482910|bitstamp,coinbase,kraken|median",
+  "canonical": "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|bitstamp,coinbase,kraken|median",
   "signature": "MEUCIQDr7y8Hx...",
   "pubkey": "0220a2222aae..."
 }
@@ -136,53 +136,23 @@ This separation means oracle code is simple, testable, and payment-agnostic.
 
 ### Endpoints
 
-All endpoints are served via `https://api.myceliasignal.com` with Cloudflare TLS. nginx routes requests to the appropriate backend proxy.
+Oracles expose HTTP GET endpoints. The URL path determines the data type:
 
-#### L402 endpoints (Lightning payment)
-
-| Public Path | Data |
+| Path | Data |
 |---|---|
 | `/oracle/btcusd` | BTCUSD spot price (median, 9 sources) |
 | `/oracle/btcusd/vwap` | BTCUSD volume-weighted average |
 | `/oracle/ethusd` | ETHUSD spot price (median, 5 sources) |
-| `/oracle/eurusd` | EURUSD spot price (median, 8 sources) |
+| `/oracle/eurusd` | EURUSD spot price (median, 7 sources) |
 | `/oracle/xauusd` | XAU/USD gold spot price (median, 8 sources) |
 | `/oracle/btceur` | BTC/EUR cross-rate (derived from BTCUSD + EURUSD) |
 | `/oracle/solusd` | SOL/USD spot price (median, 9 sources) |
-| `/oracle/etheur` | ETH/EUR hybrid spot (3 direct + cross-rate) |
-| `/oracle/soleur` | SOL/EUR hybrid spot (3 direct + cross-rate) |
-| `/oracle/xaueur` | XAU/EUR cross-rate (derived from XAUUSD + EURUSD) |
-| `/oracle/btceur/vwap` | BTC/EUR VWAP cross-rate |
 | `/dlc/oracle/attestations/{id}` | DLC Schnorr attestation (1000 sats) |
-
-#### x402 endpoints (USDC on Base)
-
-| Public Path | Data |
-|---|---|
-| `/oracle/btcusd` | BTCUSD spot price (median, 9 sources) |
-| `/oracle/btcusd/vwap` | BTCUSD volume-weighted average |
-| `/oracle/ethusd` | ETHUSD spot price (median, 5 sources) |
-| `/oracle/eurusd` | EURUSD spot price (median, 8 sources) |
-| `/oracle/xauusd` | XAU/USD gold spot price (median, 8 sources) |
-| `/oracle/btceur` | BTC/EUR cross-rate |
-| `/oracle/solusd` | SOL/USD spot price (median, 9 sources) |
-| `/oracle/etheur` | ETH/EUR hybrid spot (3 direct + cross-rate) |
-| `/oracle/soleur` | SOL/EUR hybrid spot (3 direct + cross-rate) |
-| `/oracle/xaueur` | XAU/EUR cross-rate (derived from XAUUSD + EURUSD) |
-| `/oracle/btceur/vwap` | BTC/EUR VWAP cross-rate |
-
-Note: nginx strips the `/sho/` prefix before proxying to the x402 backend, so the x402 proxy internally handles `/oracle/*` paths.
-
-#### Free endpoints (no payment)
-
-| Public Path | Data |
-|---|---|
-| `/health` | L402 proxy health check |
-| `/health` | x402 proxy health check |
-| `/sho/info` | x402 oracle info (pubkey, endpoints, pricing) |
-| `/dlc/oracle/pubkey` | DLC oracle public key |
-| `/dlc/oracle/announcements` | DLC nonce commitments |
-| `/dlc/oracle/status` | DLC oracle status |
+| `/health` | Health check (not payment-gated) |
+| `/oracle/status` | Oracle status (not payment-gated) |
+| `/dlc/oracle/pubkey` | DLC oracle public key (not payment-gated) |
+| `/dlc/oracle/announcements` | DLC nonce commitments (not payment-gated) |
+| `/dlc/oracle/status` | DLC oracle status (not payment-gated) |
 
 ### Content Type
 
@@ -247,106 +217,10 @@ These constraints are intentional and will not change:
 4. **No client authentication.** Payment is authentication. No API keys, no OAuth.
 5. **No data caching guarantee.** Each query hits the sources live. Freshness over efficiency.
 6. **No consensus between oracles.** Each oracle signs independently. Aggregation is the client's job.
-
-## x402 Payment Protocol (SHO)
-
-SHO extends the protocol with x402 payment support, accepting USDC on Base. The canonical message format is identical — only the signing scheme and payment mechanism differ.
-
-### Flow
-```
-1. Client  →  GET /oracle/btcusd            →  nginx → x402 Proxy
-2. Proxy   →  402 + payment requirements    →  Client
-3. Client  →  Send USDC on Base             →  Base chain
-4. Client  →  GET + X-Payment header        →  nginx → SHO Proxy
-5. Proxy   →  200 + Ed25519 signed data     →  Client
 ```
 
-### 402 Response
+---
 
-The SHO returns a standard x402-compliant 402 response with both a `Payment-Required` HTTP header (base64-encoded) and a JSON body. This is compatible with standard x402 client SDKs (`@x402/fetch`, `@x402/axios`), x402scan, and the Coinbase facilitator.
-
-**Response body:**
-```json
-{
-  "x402Version": 1,
-  "accepts": [
-    {
-      "scheme": "exact",
-      "network": "eip155:8453",
-      "maxAmountRequired": "1000",
-      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-      "payTo": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-      "resource": "https://api.myceliasignal.com/oracle/btcusd",
-      "mimeType": "application/json",
-      "description": "Signed price attestation",
-      "maxTimeoutSeconds": 300
-    }
-  ],
-  "error": "X-PAYMENT header is required",
-  "x402": {
-    "version": "1",
-    "chain": "base",
-    "asset": "USDC",
-    "contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    "recipient": "0xD593832Ce9C2B13B192ba50B55dd9AF44e96700d",
-    "amount": "0.001",
-    "nonce": "752c6f1f5c46e8c9031a5a4cec5db1be",
-    "expires_in": 300
-  }
-}
+Add that to `docs/Protocol.md` (replacing the old version). How's the channel?
 ```
-
-**Response headers:**
-```
-HTTP/1.1 402 Payment Required
-Payment-Required: <base64-encoded accepts array>
-Content-Type: application/json
-```
-
-The `accepts` array follows the standard x402 PaymentRequirements schema. The `x402` object is retained for backward compatibility with existing Mycelia Signal clients. `maxAmountRequired` is in USDC atomic units (6 decimals): `1000` = $0.001.
-### Authenticated Retry
-
-After sending USDC on Base, the client retries with an `X-Payment` header:
-```
-GET /oracle/btcusd HTTP/1.1
-X-PAYMENT: <base64-encoded PaymentPayload with EIP-3009 signature>
-```
-
-### Ed25519 Signing
-
-x402 responses are signed with Ed25519 instead of secp256k1 ECDSA:
-
-- Curve: **Ed25519**
-- Hash: **SHA-256**
-- Process: `sign(SHA256(canonical))`
-
-```python
-import hashlib, base64
-from nacl.signing import VerifyKey
-
-def verify_ed25519(canonical: str, signature_b64: str, pubkey_hex: str) -> bool:
-    msg_hash = hashlib.sha256(canonical.encode()).digest()
-    sig = base64.b64decode(signature_b64)
-    vk = VerifyKey(bytes.fromhex(pubkey_hex))
-    vk.verify(msg_hash, sig)
-    return True
-```
-
-### Optimistic Delivery
-
-The x402 proxy verifies and settles payments via the CDP facilitator before returning data. EIP-3009 signatures are verified off-chain and settled on-chain by the facilitator. If verification or settlement fails, the sending address is subject to tiered enforcement (grace cooldown → hard block).
-
-### Depeg Circuit Breaker
-
-If USDC deviates more than 2% from USD parity (median of 5 sources: Kraken, Bitstamp, Coinbase, Gemini, Bitfinex; minimum 2 required), the x402 proxy suspends payment acceptance and returns HTTP 503.
-
-### Dual Signing Identity
-
-Both L402 and x402 delivery use the same canonical message format. The same attestation can be verified by either key:
-
-| Delivery | Signing Scheme | Pubkey |
-|---|---|---|
-| L402 (SLO) | ECDSA secp256k1 | `0236a051b7a0384ebe19fe31fcee6837bff7a9532a2a9ae04731ea04df5cd94adf` |
-| x402 (SHO) | Ed25519 | `c40ad8cbd866189eecb7c68091a984644fb7736ef3b8d96cd31b600ef0072623` |
-
-A cross-certification statement binding both keys will be published, proving common ownership under a single oracle identity.
+curl -k --header "Grpc-Metadata-macaroon: %MAC%" https://mycelia.m.voltageapp.io:8080/v1/channels/pending
