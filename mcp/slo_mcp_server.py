@@ -33,7 +33,7 @@ mcp = FastMCP(
 L402_BASE = "http://104.197.109.246:8080"
 
 # x402 proxy — direct IP, same reason
-X402_BASE = "http://104.197.109.246:8402"
+X402_BASE = os.environ.get("SLO_X402_BASE", "https://api.myceliasignal.com")
 
 # ── Endpoint URLs ─────────────────────────────────────────────────────────────
 
@@ -54,7 +54,6 @@ L402_URLS = {
     # Crypto — VWAP
     "btc_usd_vwap": f"{L402_BASE}/oracle/price/btc/usd/vwap",
     "btc_eur_vwap": f"{L402_BASE}/oracle/price/btc/eur/vwap",
-    "btc_jpy_vwap": f"{L402_BASE}/oracle/price/btc/jpy/vwap",
     # Precious metals
     "xau_usd":      f"{L402_BASE}/oracle/price/xau/usd",
     "xau_eur":      f"{L402_BASE}/oracle/price/xau/eur",
@@ -186,10 +185,10 @@ def _parse_canonical(canonical):
             "price":     parts[3] if len(parts) > 3 else "",
             "currency":  parts[4] if len(parts) > 4 else "",
             "decimals":  int(parts[5]) if len(parts) > 5 else 0,
-            "sources":   parts[6].split(",") if len(parts) > 6 else [],
-            "method":    parts[7] if len(parts) > 7 else "",
-            "timestamp": parts[8] if len(parts) > 8 else "",
-            "nonce":     parts[9] if len(parts) > 9 else "",
+            "timestamp": parts[6] if len(parts) > 6 else "",
+            "nonce":     parts[7] if len(parts) > 7 else "",
+            "sources":   parts[8].split(",") if len(parts) > 8 else [],
+            "method":    parts[9] if len(parts) > 9 else "",
         })
     else:
         # v1|US|INDICATOR|VALUE|UNIT|REF_START|REF_END|SOURCE|SERIES_ID|METHOD|EXTRA|NONCE
@@ -262,75 +261,99 @@ def _build_result(data, signing_scheme="secp256k1"):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_btc_usd() -> dict:
     """Get BTC/USD spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["btc_usd"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_btc_usd_vwap() -> dict:
     """Get BTC/USD 5-min VWAP via L402 (Lightning). 20 sats."""
     return _build_result(_fetch_l402(L402_URLS["btc_usd_vwap"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_btc_eur() -> dict:
     """Get BTC/EUR spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["btc_eur"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_btc_eur_vwap() -> dict:
     """Get BTC/EUR 5-min VWAP via L402 (Lightning). 20 sats."""
     return _build_result(_fetch_l402(L402_URLS["btc_eur_vwap"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_btc_jpy() -> dict:
     """Get BTC/JPY spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["btc_jpy"]))
 
-@mcp.tool()
-def get_btc_jpy_vwap() -> dict:
-    """Get BTC/JPY 5-min VWAP via L402 (Lightning). 20 sats."""
-    return _build_result(_fetch_l402(L402_URLS["btc_jpy_vwap"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eth_usd() -> dict:
     """Get ETH/USD spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eth_usd"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_eth_eur() -> dict:
     """Get ETH/EUR spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eth_eur"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eth_jpy() -> dict:
     """Get ETH/JPY spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eth_jpy"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_sol_usd() -> dict:
     """Get SOL/USD spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["sol_usd"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_sol_eur() -> dict:
     """Get SOL/EUR spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["sol_eur"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_sol_jpy() -> dict:
     """Get SOL/JPY spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["sol_jpy"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_xrp_usd() -> dict:
     """Get XRP/USD spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["xrp_usd"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_ada_usd() -> dict:
     """Get ADA/USD spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["ada_usd"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_doge_usd() -> dict:
     """Get DOGE/USD spot price via L402 (Lightning). 10 sats."""
@@ -340,15 +363,21 @@ def get_doge_usd() -> dict:
 # ── L402 — Precious Metals ────────────────────────────────────────────────────
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_xau_usd() -> dict:
     """Get XAU/USD (gold) spot price via L402 (Lightning). 10 sats. 8 sources."""
     return _build_result(_fetch_l402(L402_URLS["xau_usd"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_xau_eur() -> dict:
     """Get XAU/EUR (gold in euros) spot price via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["xau_eur"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_xau_jpy() -> dict:
     """Get XAU/JPY (gold in yen) spot price via L402 (Lightning). 10 sats."""
@@ -358,100 +387,140 @@ def get_xau_jpy() -> dict:
 # ── L402 — FX Rates ───────────────────────────────────────────────────────────
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_eur_usd() -> dict:
     """Get EUR/USD rate via L402 (Lightning). 10 sats. 6 central banks + exchanges."""
     return _build_result(_fetch_l402(L402_URLS["eur_usd"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eur_jpy() -> dict:
     """Get EUR/JPY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eur_jpy"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_eur_gbp() -> dict:
     """Get EUR/GBP rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eur_gbp"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eur_chf() -> dict:
     """Get EUR/CHF rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eur_chf"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_eur_cny() -> dict:
     """Get EUR/CNY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eur_cny"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eur_cad() -> dict:
     """Get EUR/CAD rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["eur_cad"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_gbp_usd() -> dict:
     """Get GBP/USD rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["gbp_usd"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_gbp_jpy() -> dict:
     """Get GBP/JPY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["gbp_jpy"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_gbp_chf() -> dict:
     """Get GBP/CHF rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["gbp_chf"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_gbp_cny() -> dict:
     """Get GBP/CNY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["gbp_cny"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_gbp_cad() -> dict:
     """Get GBP/CAD rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["gbp_cad"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_usd_jpy() -> dict:
     """Get USD/JPY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["usd_jpy"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_usd_chf() -> dict:
     """Get USD/CHF rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["usd_chf"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_usd_cny() -> dict:
     """Get USD/CNY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["usd_cny"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_usd_cad() -> dict:
     """Get USD/CAD rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["usd_cad"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_chf_jpy() -> dict:
     """Get CHF/JPY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["chf_jpy"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_chf_cad() -> dict:
     """Get CHF/CAD rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["chf_cad"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_cny_jpy() -> dict:
     """Get CNY/JPY rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["cny_jpy"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_cny_cad() -> dict:
     """Get CNY/CAD rate via L402 (Lightning). 10 sats."""
     return _build_result(_fetch_l402(L402_URLS["cny_cad"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_cad_jpy() -> dict:
     """Get CAD/JPY rate via L402 (Lightning). 10 sats."""
@@ -461,40 +530,56 @@ def get_cad_jpy() -> dict:
 # ── L402 — US Economic Indicators ─────────────────────────────────────────────
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_us_cpi() -> dict:
     """Get US CPI headline inflation via L402 (Lightning). 1000 sats. Source: BLS."""
     return _build_result(_fetch_l402(L402_URLS["us_cpi"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_us_cpi_core() -> dict:
     """Get US CPI Core (ex food & energy) via L402 (Lightning). 1000 sats. Source: BLS/FRED."""
     return _build_result(_fetch_l402(L402_URLS["us_cpi_core"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_us_unemployment() -> dict:
     """Get US Unemployment Rate via L402 (Lightning). 1000 sats. Source: BLS/FRED."""
     return _build_result(_fetch_l402(L402_URLS["us_unrate"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_us_nfp() -> dict:
     """Get US Nonfarm Payrolls via L402 (Lightning). 1000 sats. Source: BLS/FRED."""
     return _build_result(_fetch_l402(L402_URLS["us_nfp"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_us_fedfunds() -> dict:
     """Get US Federal Funds Rate via L402 (Lightning). 1000 sats. Source: FRED."""
     return _build_result(_fetch_l402(L402_URLS["us_fedfunds"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_us_gdp() -> dict:
     """Get US GDP via L402 (Lightning). 1000 sats. Source: BEA/FRED."""
     return _build_result(_fetch_l402(L402_URLS["us_gdp"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_us_pce() -> dict:
     """Get US PCE Price Index via L402 (Lightning). 1000 sats. Source: BEA/FRED."""
     return _build_result(_fetch_l402(L402_URLS["us_pce"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_us_yield_curve() -> dict:
     """Get US Yield Curve (10Y-2Y spread) via L402 (Lightning). 1000 sats. Source: FRED."""
@@ -504,30 +589,42 @@ def get_us_yield_curve() -> dict:
 # ── L402 — EU Economic Indicators ─────────────────────────────────────────────
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_eu_hicp() -> dict:
     """Get EU HICP headline inflation via L402 (Lightning). 1000 sats. Source: Eurostat."""
     return _build_result(_fetch_l402(L402_URLS["eu_hicp"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eu_hicp_core() -> dict:
     """Get EU HICP Core inflation via L402 (Lightning). 1000 sats. Source: Eurostat."""
     return _build_result(_fetch_l402(L402_URLS["eu_hicp_core"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_eu_hicp_services() -> dict:
     """Get EU HICP Services inflation via L402 (Lightning). 1000 sats. Source: Eurostat."""
     return _build_result(_fetch_l402(L402_URLS["eu_hicp_services"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eu_unemployment() -> dict:
     """Get EU Unemployment Rate via L402 (Lightning). 1000 sats. Source: Eurostat."""
     return _build_result(_fetch_l402(L402_URLS["eu_unrate"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_eu_gdp() -> dict:
     """Get EU GDP via L402 (Lightning). 1000 sats. Source: Eurostat."""
     return _build_result(_fetch_l402(L402_URLS["eu_gdp"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_eu_employment() -> dict:
     """Get EU Employment via L402 (Lightning). 1000 sats. Source: Eurostat."""
@@ -537,25 +634,35 @@ def get_eu_employment() -> dict:
 # ── L402 — Commodities ────────────────────────────────────────────────────────
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_wti() -> dict:
     """Get WTI Crude Oil price via L402 (Lightning). 1000 sats. Source: EIA/FRED."""
     return _build_result(_fetch_l402(L402_URLS["wti"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_brent() -> dict:
     """Get Brent Crude Oil price via L402 (Lightning). 1000 sats. Source: FRED."""
     return _build_result(_fetch_l402(L402_URLS["brent"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_natgas() -> dict:
     """Get Henry Hub Natural Gas price via L402 (Lightning). 1000 sats. Source: EIA/FRED."""
     return _build_result(_fetch_l402(L402_URLS["natgas"]))
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def get_copper() -> dict:
     """Get Copper price via L402 (Lightning). 1000 sats. Source: FRED."""
     return _build_result(_fetch_l402(L402_URLS["copper"]))
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_dxy() -> dict:
     """Get US Dollar Index (DXY) via L402 (Lightning). 1000 sats. Source: FRED."""
@@ -574,75 +681,101 @@ def _x402(key):
 
 # Crypto — spot
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_btc_usd() -> dict:
     """Get BTC/USD spot price via x402 (USDC on Base). $0.01."""
     return _x402("btc_usd")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_btc_usd_vwap() -> dict:
     """Get BTC/USD VWAP via x402 (USDC on Base). $0.02."""
     return _x402("btc_usd_vwap")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_btc_eur() -> dict:
     """Get BTC/EUR spot price via x402 (USDC on Base). $0.01."""
     return _x402("btc_eur")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_btc_eur_vwap() -> dict:
     """Get BTC/EUR VWAP via x402 (USDC on Base). $0.02."""
     return _x402("btc_eur_vwap")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_btc_jpy() -> dict:
     """Get BTC/JPY spot price via x402 (USDC on Base). $0.01."""
     return _x402("btc_jpy")
 
 @mcp.tool()
-def x402_get_btc_jpy_vwap() -> dict:
-    """Get BTC/JPY VWAP via x402 (USDC on Base). $0.02."""
-    return _x402("btc_jpy_vwap")
+@mcp.tool()
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eth_usd() -> dict:
     """Get ETH/USD spot price via x402 (USDC on Base). $0.01."""
     return _x402("eth_usd")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_eth_eur() -> dict:
     """Get ETH/EUR spot price via x402 (USDC on Base). $0.01."""
     return _x402("eth_eur")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eth_jpy() -> dict:
     """Get ETH/JPY spot price via x402 (USDC on Base). $0.01."""
     return _x402("eth_jpy")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_sol_usd() -> dict:
     """Get SOL/USD spot price via x402 (USDC on Base). $0.01."""
     return _x402("sol_usd")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_sol_eur() -> dict:
     """Get SOL/EUR spot price via x402 (USDC on Base). $0.01."""
     return _x402("sol_eur")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_sol_jpy() -> dict:
     """Get SOL/JPY spot price via x402 (USDC on Base). $0.01."""
     return _x402("sol_jpy")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_xrp_usd() -> dict:
     """Get XRP/USD spot price via x402 (USDC on Base). $0.01."""
     return _x402("xrp_usd")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_ada_usd() -> dict:
     """Get ADA/USD spot price via x402 (USDC on Base). $0.01."""
     return _x402("ada_usd")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_doge_usd() -> dict:
     """Get DOGE/USD spot price via x402 (USDC on Base). $0.01."""
@@ -650,15 +783,21 @@ def x402_get_doge_usd() -> dict:
 
 # Precious metals
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_xau_usd() -> dict:
     """Get XAU/USD (gold) spot price via x402 (USDC on Base). $0.01."""
     return _x402("xau_usd")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_xau_eur() -> dict:
     """Get XAU/EUR (gold in euros) via x402 (USDC on Base). $0.01."""
     return _x402("xau_eur")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_xau_jpy() -> dict:
     """Get XAU/JPY (gold in yen) via x402 (USDC on Base). $0.01."""
@@ -666,100 +805,140 @@ def x402_get_xau_jpy() -> dict:
 
 # FX rates
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_eur_usd() -> dict:
     """Get EUR/USD rate via x402 (USDC on Base). $0.01."""
     return _x402("eur_usd")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eur_jpy() -> dict:
     """Get EUR/JPY rate via x402 (USDC on Base). $0.01."""
     return _x402("eur_jpy")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_eur_gbp() -> dict:
     """Get EUR/GBP rate via x402 (USDC on Base). $0.01."""
     return _x402("eur_gbp")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eur_chf() -> dict:
     """Get EUR/CHF rate via x402 (USDC on Base). $0.01."""
     return _x402("eur_chf")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_eur_cny() -> dict:
     """Get EUR/CNY rate via x402 (USDC on Base). $0.01."""
     return _x402("eur_cny")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eur_cad() -> dict:
     """Get EUR/CAD rate via x402 (USDC on Base). $0.01."""
     return _x402("eur_cad")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_gbp_usd() -> dict:
     """Get GBP/USD rate via x402 (USDC on Base). $0.01."""
     return _x402("gbp_usd")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_gbp_jpy() -> dict:
     """Get GBP/JPY rate via x402 (USDC on Base). $0.01."""
     return _x402("gbp_jpy")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_gbp_chf() -> dict:
     """Get GBP/CHF rate via x402 (USDC on Base). $0.01."""
     return _x402("gbp_chf")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_gbp_cny() -> dict:
     """Get GBP/CNY rate via x402 (USDC on Base). $0.01."""
     return _x402("gbp_cny")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_gbp_cad() -> dict:
     """Get GBP/CAD rate via x402 (USDC on Base). $0.01."""
     return _x402("gbp_cad")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_usd_jpy() -> dict:
     """Get USD/JPY rate via x402 (USDC on Base). $0.01."""
     return _x402("usd_jpy")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_usd_chf() -> dict:
     """Get USD/CHF rate via x402 (USDC on Base). $0.01."""
     return _x402("usd_chf")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_usd_cny() -> dict:
     """Get USD/CNY rate via x402 (USDC on Base). $0.01."""
     return _x402("usd_cny")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_usd_cad() -> dict:
     """Get USD/CAD rate via x402 (USDC on Base). $0.01."""
     return _x402("usd_cad")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_chf_jpy() -> dict:
     """Get CHF/JPY rate via x402 (USDC on Base). $0.01."""
     return _x402("chf_jpy")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_chf_cad() -> dict:
     """Get CHF/CAD rate via x402 (USDC on Base). $0.01."""
     return _x402("chf_cad")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_cny_jpy() -> dict:
     """Get CNY/JPY rate via x402 (USDC on Base). $0.01."""
     return _x402("cny_jpy")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_cny_cad() -> dict:
     """Get CNY/CAD rate via x402 (USDC on Base). $0.01."""
     return _x402("cny_cad")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_cad_jpy() -> dict:
     """Get CAD/JPY rate via x402 (USDC on Base). $0.01."""
@@ -767,40 +946,56 @@ def x402_get_cad_jpy() -> dict:
 
 # US Economic
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_us_cpi() -> dict:
     """Get US CPI via x402 (USDC on Base). $0.10."""
     return _x402("us_cpi")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_us_cpi_core() -> dict:
     """Get US CPI Core via x402 (USDC on Base). $0.10."""
     return _x402("us_cpi_core")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_us_unemployment() -> dict:
     """Get US Unemployment Rate via x402 (USDC on Base). $0.10."""
     return _x402("us_unrate")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_us_nfp() -> dict:
     """Get US Nonfarm Payrolls via x402 (USDC on Base). $0.10."""
     return _x402("us_nfp")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_us_fedfunds() -> dict:
     """Get US Federal Funds Rate via x402 (USDC on Base). $0.10."""
     return _x402("us_fedfunds")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_us_gdp() -> dict:
     """Get US GDP via x402 (USDC on Base). $0.10."""
     return _x402("us_gdp")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_us_pce() -> dict:
     """Get US PCE Price Index via x402 (USDC on Base). $0.10."""
     return _x402("us_pce")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_us_yield_curve() -> dict:
     """Get US Yield Curve (10Y-2Y) via x402 (USDC on Base). $0.10."""
@@ -808,30 +1003,42 @@ def x402_get_us_yield_curve() -> dict:
 
 # EU Economic
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_eu_hicp() -> dict:
     """Get EU HICP inflation via x402 (USDC on Base). $0.10."""
     return _x402("eu_hicp")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eu_hicp_core() -> dict:
     """Get EU HICP Core inflation via x402 (USDC on Base). $0.10."""
     return _x402("eu_hicp_core")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_eu_hicp_services() -> dict:
     """Get EU HICP Services inflation via x402 (USDC on Base). $0.10."""
     return _x402("eu_hicp_services")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eu_unemployment() -> dict:
     """Get EU Unemployment Rate via x402 (USDC on Base). $0.10."""
     return _x402("eu_unrate")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_eu_gdp() -> dict:
     """Get EU GDP via x402 (USDC on Base). $0.10."""
     return _x402("eu_gdp")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_eu_employment() -> dict:
     """Get EU Employment via x402 (USDC on Base). $0.10."""
@@ -839,25 +1046,35 @@ def x402_get_eu_employment() -> dict:
 
 # Commodities
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_wti() -> dict:
     """Get WTI Crude Oil price via x402 (USDC on Base). $0.10."""
     return _x402("wti")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_brent() -> dict:
     """Get Brent Crude Oil price via x402 (USDC on Base). $0.10."""
     return _x402("brent")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_natgas() -> dict:
     """Get Henry Hub Natural Gas price via x402 (USDC on Base). $0.10."""
     return _x402("natgas")
 
 @mcp.tool()
+@mcp.tool()
+@mcp.tool()
 def x402_get_copper() -> dict:
     """Get Copper price via x402 (USDC on Base). $0.10."""
     return _x402("copper")
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def x402_get_dxy() -> dict:
     """Get US Dollar Index (DXY) via x402 (USDC on Base). $0.10."""
@@ -868,6 +1085,8 @@ def x402_get_dxy() -> dict:
 # Free Tools
 # ══════════════════════════════════════════════════════════════════════════════
 
+@mcp.tool()
+@mcp.tool()
 @mcp.tool()
 def get_health() -> dict:
     """Check Mycelia Signal API health. Free endpoint."""
