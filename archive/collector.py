@@ -256,7 +256,7 @@ def poll_oracles():
         url = f"{cfg['base']}{cfg['path']}"
         is_preview = pair in PREVIEW_PAIRS
         try:
-            resp = requests.get(url, timeout=15)
+            resp = requests.get(url, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             archive_oracle_response(
@@ -278,7 +278,7 @@ def poll_dlc():
     conn = get_conn()
     try:
         url = f"http://localhost:{DLC_PORT}{DLC_ATTESTATIONS_PATH}"
-        resp = requests.get(url, timeout=15)
+        resp = requests.get(url, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         attestations = data if isinstance(data, list) else data.get("attestations", [])
