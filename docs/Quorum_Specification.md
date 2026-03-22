@@ -1,6 +1,6 @@
 # Quorum Specification
 
-How clients aggregate responses from multiple SLO oracles to arrive at a trusted price.
+How clients aggregate responses from multiple Mycelia Signal oracle instances to arrive at a trusted price.
 
 ## Why Quorum?
 
@@ -10,7 +10,9 @@ A single oracle can lie, fail, or be compromised. Querying multiple independent 
 - **Manipulation resistance** — An attacker must compromise multiple oracles simultaneously
 - **Accuracy** — Outliers are filtered by the aggregation method
 
-SLO does not enforce quorum at the protocol level. Quorum is a client-side responsibility. This specification defines the recommended approach.
+Mycelia Signal does not enforce quorum at the protocol level. Quorum is a client-side responsibility. This specification defines the recommended approach.
+
+Note: Mycelia Signal runs two independent GC instances (US and Asia). Clients can query both as independent oracle endpoints for built-in quorum.
 
 ## Parameters
 
@@ -28,15 +30,15 @@ The client maintains a list of trusted oracles:
 ```python
 ORACLES = [
     {
-        "name": "spot",
-        "url": "https://api.myceliasignal.com/oracle/btcusd",
-        "pubkey": "0220a2222aae...",   # pin for identity verification
-        "weight": 1.0,                  # optional: weight in aggregation
+        "name": "mycelia-us",
+        "url": "https://api.myceliasignal.com/oracle/price/btc/usd",
+        "pubkey": "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+        "weight": 1.0,
     },
     {
-        "name": "vwap",
-        "url": "https://api.myceliasignal.com/oracle/btcusd/vwap",
-        "pubkey": "03f1b2c3d4e5...",
+        "name": "mycelia-asia",
+        "url": "https://api.myceliasignal.com/oracle/price/btc/usd",
+        "pubkey": "02b1377c30c7dcfcba428cf299c18782856a12eb4fab32b87081460f4ba2deab73",
         "weight": 1.0,
     },
     # Add third-party operators as they come online
@@ -49,13 +51,14 @@ There is no oracle registry. The client decides which oracles to trust. This is 
 
 For each oracle in the set:
 
-1. Send HTTP GET request (with L402 payment)
+1. Send HTTP GET request (with L402 or x402 payment)
 2. If the request fails (timeout, connection error, 500), skip this oracle
 3. If the request succeeds, proceed to validation
+
 ```
 for each oracle in ORACLES:
     try:
-        response = l402_fetch(oracle.url)
+        response = fetch_with_payment(oracle.url)
     except (Timeout, ConnectionError, PaymentFailed):
         log("oracle {oracle.name} unreachable, skipping")
         continue
@@ -67,8 +70,11 @@ for each oracle in ORACLES:
 Each response must pass four checks before inclusion in aggregation:
 
 ### 1. Signature Verification
+
 ```
-hash = SHA256(response.canonical)
+# canonical field for price responses; canonicalstring for econ responses
+canonical = response.canonical or response.canonicalstring
+hash = SHA256(canonical.encode("utf-8"))
 valid = ECDSA_verify(hash, response.signature, response.pubkey)
 if not valid:
     REJECT("invalid signature")
@@ -77,6 +83,7 @@ if not valid:
 A failed signature means the data was tampered with in transit or the oracle is broken. Always reject.
 
 ### 2. Pubkey Pinning
+
 ```
 if oracle.pinned_pubkey and response.pubkey != oracle.pinned_pubkey:
     REJECT("pubkey mismatch — possible impersonation")
@@ -85,9 +92,14 @@ if oracle.pinned_pubkey and response.pubkey != oracle.pinned_pubkey:
 If you have previously recorded an oracle's public key, reject responses signed by a different key. This prevents an attacker from substituting a different oracle at the same URL.
 
 ### 3. Staleness Check
+
 ```
-assertion_time = parse_timestamp(response.canonical)
-age = now_utc() - assertion_time
+# PRICE spec v0.4: timestamp at parts[8]
+# ECON spec v0.4: timestamp at parts[11]
+parts = canonical.split("|")
+ts_index = 8 if parts[1] == "PRICE" else 11
+assertion_time = int(parts[ts_index])
+age = now_utc_unix() - assertion_time
 if age > MAX_STALENESS_SEC:
     REJECT("assertion too old: {age} seconds")
 ```
@@ -95,13 +107,16 @@ if age > MAX_STALENESS_SEC:
 Stale data may reflect prices that have moved significantly. Reject assertions older than your threshold.
 
 ### 4. Format Validation
+
 ```
-parts = response.canonical.split("|")
+parts = canonical.split("|")
+# PRICE spec v0.4: v1|PRICE|PAIR|VALUE|CURRENCY|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE
 assert parts[0] == "v1"           # known protocol version
-assert parts[1] == "BTCUSD"       # expected asset pair
-assert parts[3] == "USD"          # expected quote currency
-assert len(parts) == 9            # correct field count
-price = float(parts[2])           # parseable price
+assert parts[1] == "PRICE"        # message type
+assert parts[2] == "BTCUSD"       # expected asset pair
+assert parts[4] == "USD"          # expected quote currency
+assert len(parts) == 10           # correct field count (spec v0.4)
+price = float(parts[3])           # parseable price at position 3
 assert price > 0                  # positive price
 ```
 
@@ -112,6 +127,7 @@ Reject any response that doesn't conform to the expected canonical format.
 After validation, the client has a set of accepted prices. Aggregation proceeds as follows:
 
 ### Step 1: Check Minimum Responses
+
 ```
 if len(valid_prices) < MIN_RESPONSES:
     FAIL("quorum not met: got {n}, need {MIN_RESPONSES}")
@@ -120,6 +136,7 @@ if len(valid_prices) < MIN_RESPONSES:
 If too few oracles responded with valid data, the client should not produce a price. Fail loudly.
 
 ### Step 2: Compute Median
+
 ```
 median_price = median(valid_prices)
 ```
@@ -127,6 +144,7 @@ median_price = median(valid_prices)
 Median is preferred over mean because it is resistant to outliers. A single manipulated oracle cannot move the median significantly.
 
 ### Step 3: Coherence Check
+
 ```
 for each price in valid_prices:
     deviation = abs(price - median_price) / median_price * 100
@@ -143,6 +161,7 @@ If any accepted oracle deviates too far from the median, something is wrong. Pos
 The safe response is to reject the entire batch and alert the operator.
 
 ### Step 4: Return Result
+
 ```
 RESULT = {
     "price": median_price,
@@ -196,6 +215,7 @@ No oracles respond. Client should:
 ## Weighted Aggregation (Advanced)
 
 For clients with more than two oracles, weighted median can reflect differing levels of trust:
+
 ```python
 def weighted_median(prices, weights):
     sorted_pairs = sorted(zip(prices, weights))
@@ -216,6 +236,7 @@ Weight assignment is subjective. Factors to consider:
 ## Reference Implementation
 
 The included quorum client implements this specification:
+
 ```bash
 python client/quorum_client_l402.py --backend lnget
 ```
@@ -227,25 +248,5 @@ Source: [client/quorum_client_l402.py](../client/quorum_client_l402.py)
 1. **Client sovereignty.** The client chooses oracles, parameters, and failure behavior. No protocol-level governance.
 2. **Fail loud.** When quorum fails, the client knows immediately. Silent fallbacks are dangerous.
 3. **Median over mean.** Median resists manipulation. Mean amplifies it.
-4. **Coherence over consensus.** SLO doesn't ask oracles to agree. It asks the client to check whether they agree.
+4. **Coherence over consensus.** Mycelia Signal doesn't ask oracles to agree. It asks the client to check whether they agree.
 5. **Explicit thresholds.** Every parameter (`MIN_RESPONSES`, `MAX_DEVIATION_PCT`, `MAX_STALENESS_SEC`) is visible, tunable, and auditable.
-```
-
----
-
-That's all the docs. Full set:
-
-| File | Description |
-|---|---|
-| `README.md` | Project overview, benefits, live endpoint |
-| `docs/Protocol.md` | Canonical format, signing, L402 flow |
-| `docs/Quorum_Specification.md` | Client aggregation rules |
-| `docs/DEMO.md` | Step-by-step live walkthrough |
-| `docs/CLIENT_INTEGRATION.md` | Python, JS, Go integration |
-| `docs/OPERATOR_GUIDE.md` | How to run your own oracle |
-| `docs/DEPLOYMENT.md` | GCP + Voltage production setup |
-| `docs/POLAR_SETUP.md` | Local demo with Polar |
-
-Check the channel:
-```
-curl -k --header "Grpc-Metadata-macaroon: %MAC%" https://mycelia.m.voltageapp.io:8080/v1/channels/pending
