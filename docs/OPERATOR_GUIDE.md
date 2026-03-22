@@ -1,47 +1,55 @@
 # Oracle Operator's Guide
 
-How to run your own Sovereign Lightning Oracle and sell signed data for sats.
+How to run your own sovereign oracle using the Mycelia Signal stack and sell signed data for sats and USDC.
 
 ## Overview
 
-An SLO operator runs one or more oracle servers behind a custom L402 proxy, connected to a Lightning node. Clients pay Lightning invoices to receive signed price assertions. You earn sats for every query.
+An operator runs one or more oracle backends behind an L402 proxy (Lightning) and/or x402 proxy (USDC on Base), connected to a Lightning node and/or a Coinbase CDP account. Clients pay per query and receive cryptographically signed price attestations. You earn sats or USDC for every query.
 
 ## What You Need
 
-1. **A Linux server** — Cloud VM (GCP, AWS, etc.) or your own hardware
-2. **A Lightning node** — LND (self-hosted or Voltage/hosted)
-3. **Go 1.21+** — For building the L402 proxy
-4. **Python 3.10+** — For running the oracle servers
+1. **A Linux server** — Cloud VM (GCP, AWS, etc.) or your own hardware. Ubuntu 24 recommended.
+2. **A Lightning node** — LND (self-hosted or Voltage/hosted) for L402
+3. **Coinbase CDP account** — For x402 USDC payments on Base
+4. **Go 1.21+** — For building the L402 proxy and price-service
+5. **Python 3.10+** — For running x402 proxy and econ services
 
 Estimated costs:
-- Cloud VM: ~$15/month (GCP e2-small)
+- Cloud VM: ~$15–30/month (GCP e2-small or e2-medium)
 - Lightning node: ~$27/month (Voltage Standard) or free (self-hosted)
-- Channel liquidity: 3-4M sats (~$2,000 at current prices) for inbound capacity
+- Channel liquidity: 3–4M sats for inbound capacity
 
 ## Architecture
+
 ```
-Internet → L402 Proxy (:8080) → Oracle backends (:9100-9107)
-                 ↕
-          Your LND node
-          (REST API for invoices)
+Internet
+  │
+  ├── nginx (:80) ──────────────────────────────────────────────────┐
+  │                                                                  │
+  ├── L402 Proxy (:8080) ─── price-service (:9200)                  │
+  │        │                  econ-us (:9129)                        │
+  │        └── Voltage LND    econ-eu (:9130)                        │
+  │                           econ-commodities (:9134)               │
+  └── x402 Proxy (:8402) ─── (same backends)                        │
+           │                                                          │
+           └── Coinbase CDP (USDC verification on Base)              │
+                                                                      │
+  Cloudflare (DNS + TLS) ───────────────────────────────────────────┘
 ```
 
-The L402 proxy handles all payment logic — invoice creation, macaroon minting, and token verification. Your oracle code is a simple HTTP server that fetches prices, signs them, and returns JSON. Zero payment logic in the oracle itself.
+## Running Services
 
-## Current Production Setup
+| Service | Port | Binary/Script | Purpose |
+|---------|------|--------------|---------|
+| price-service | 9200 | `~/myceliasignal/price-service/price-service` | 37 price pairs (crypto, FX, metals) |
+| l402-proxy | 8080 | `~/myceliasignal/l402-proxy/l402-proxy` | L402 Lightning payment layer |
+| x402-proxy | 8402 | `~/myceliasignal/x402_proxy.py` | x402 USDC payment layer |
+| econ-us | 9129 | `~/myceliasignal/econ-us/econ-us` | 8 US economic indicators |
+| econ-eu | 9130 | `~/myceliasignal/econ-eu/econ-eu` | 6 EU economic indicators |
+| econ-commodities | 9134 | `~/myceliasignal/econ-commodities/econ-commodities` | 5 commodities |
+| dlc-server | 9104 | `~/myceliasignal/dlc/server.py` | DLC oracle (threshold + numeric) |
 
-SLO runs 8 oracle endpoints on a single GCP VM:
-
-| Endpoint | Port | Sources | Price |
-|---|---|---|---|
-| BTCUSD spot | 9100 | 9 exchanges (5 USD + 4 USDT) | 10 sats |
-| BTCUSD VWAP | 9101 | Coinbase, Kraken trades | 20 sats |
-| ETHUSD spot | 9102 | 5 exchanges | 10 sats |
-| EURUSD spot | 9103 | 5 central banks + 2 exchanges | 10 sats |
-| DLC attestor | 9104 | Same as BTCUSD (9 sources) | 1000 sats |
-| XAU/USD gold | 9105 | 3 traditional + 5 PAXG exchanges | 10 sats |
-| BTC/EUR cross | 9106 | Derived from BTCUSD + EURUSD | 10 sats |
-| SOL/USD spot | 9107 | 9 exchanges (5 USD + 4 USDT) | 10 sats |
+All services managed by systemd with `Restart=on-failure`.
 
 ## Step 1: Set Up Your Lightning Node
 
@@ -49,151 +57,186 @@ SLO runs 8 oracle endpoints on a single GCP VM:
 
 1. Create a mainnet node at https://app.voltage.cloud
 2. Download `tls.cert` and `admin.macaroon`
-3. Fund the node and open channels (see [DEPLOYMENT.md](DEPLOYMENT.md))
+3. Fund the node and open channels
 
 ### Option B: Self-hosted LND
 
 1. Install LND: https://github.com/lightningnetwork/lnd
-2. Sync to chain, create wallet
-3. Open channels to well-connected peers
+2. Sync to chain, create wallet, open channels
 
-Either way, you need **inbound liquidity** to receive payments. Open a channel with `push_sat` to give the remote side funds that can flow back to you when clients pay.
+You need **inbound liquidity** to receive payments. Open a channel with `push_sat` to give the remote side funds that flow back to you when clients pay.
 
-## Step 2: Install and Build
+## Step 2: Set Up Coinbase CDP (x402)
+
+1. Create a Coinbase Developer Platform account at https://developer.coinbase.com
+2. Generate an API key — save the key ID and secret
+3. Set environment variables in your x402 proxy systemd unit:
+```
+Environment="CDP_API_KEY_ID=your_key_id"
+Environment="CDP_API_KEY_SECRET=your_key_secret"
+```
+
+Set your USDC receiving address in `x402_proxy.py`:
+```python
+PAYMENT_ADDRESS = "0xYOUR_ADDRESS"
+```
+
+## Step 3: Build and Install
+
 ```bash
 # System packages
-sudo apt install -y python3 python3-pip golang-go git
+sudo apt install -y python3 python3-pip golang-go git nginx
 
 # Python dependencies
-pip3 install fastapi uvicorn ecdsa requests --break-system-packages
+pip3 install fastapi uvicorn httpx aiohttp pynacl coincurve prometheus-client --break-system-packages
 
-# Clone SLO
-git clone https://github.com/jonathanbulkeley/sovereign-lightning-oracle.git ~/slo
+# Clone the stack
+git clone https://github.com/jonathanbulkeley/Mycelia-Signal-Sovereign-Oracle.git ~/sovereign-oracle
 
-# Build the L402 proxy
-mkdir -p ~/slo-l402-proxy
-cp ~/slo/l402-proxy/* ~/slo-l402-proxy/
-cd ~/slo-l402-proxy
-go build -o slo-l402-proxy .
+# Build price-service
+cd ~/myceliasignal/price-service
+go build -o price-service .
+
+# Build L402 proxy
+cd ~/myceliasignal/l402-proxy
+go build -o l402-proxy .
+
+# Build econ services
+cd ~/myceliasignal/econ-us && go build -o econ-us .
+cd ~/myceliasignal/econ-eu && go build -o econ-eu .
+cd ~/myceliasignal/econ-commodities && go build -o econ-commodities .
 ```
 
-## Step 3: Configure Your Oracle
+## Step 4: Generate Signing Keys
 
-### Signing Keys
+Each protocol uses its own key:
 
-Each oracle generates a fresh secp256k1 key pair on startup. The public key is returned with every response so clients can verify signatures.
+```bash
+# secp256k1 key for L402 signing sidecar
+python3 -c "
+import os, coincurve
+key = coincurve.PrivateKey(os.urandom(32))
+with open('keys/secp256k1.key', 'w') as f:
+    f.write(key.secret.hex())
+print('Pubkey:', key.public_key.format(compressed=True).hex())
+"
 
-For production, you should use a persistent key so clients can pin your identity across restarts. Modify the oracle code to load a key from disk:
-```python
+# Ed25519 key for x402 signing
+python3 -c "
 import os
-from ecdsa import SigningKey, SECP256k1
+from nacl.signing import SigningKey
+key = SigningKey.generate()
+with open('keys/ed25519.key', 'w') as f:
+    f.write(key.encode().hex())
+print('Pubkey:', key.verify_key.encode().hex())
+"
 
-KEY_PATH = "/home/your_user/slo/keys/oracle.pem"
+# L402 root key (macaroon minting)
+python3 -c "import os; open('creds/macaroon-root.key','wb').write(os.urandom(32))"
 
-if os.path.exists(KEY_PATH):
-    with open(KEY_PATH, "rb") as f:
-        PRIVATE_KEY = SigningKey.from_pem(f.read())
-else:
-    PRIVATE_KEY = SigningKey.generate(curve=SECP256k1)
-    os.makedirs(os.path.dirname(KEY_PATH), exist_ok=True)
-    with open(KEY_PATH, "wb") as f:
-        f.write(PRIVATE_KEY.to_pem())
-
-PUBLIC_KEY = PRIVATE_KEY.get_verifying_key()
+chmod 600 keys/* creds/*
 ```
 
-### Price Sources
+Publish your public keys so clients can verify signatures.
 
-Each oracle feed aggregates from multiple exchanges. The pattern:
+## Step 5: Configure price-service
 
-- **Tier 1 (USD pairs):** Direct fiat trading pairs from major exchanges
-- **Tier 2 (USDT pairs):** USDT-denominated pairs normalized to USD via a live USDT/USD rate
+Edit `~/myceliasignal/config/price-service.yaml` to define your pairs and sources:
 
-The USDT/USD rate is sourced from Kraken and Bitstamp (median). If USD and USDT medians diverge by more than 0.5%, USDT sources are dropped automatically.
+```yaml
+pairs:
+  - id: btc/usd
+    sources: [binance, coinbase, kraken, bitstamp, gemini, bitfinex, okx, gateio, binanceus]
+    method: median
+    dlc: true
+  - id: eth/usd
+    sources: [coinbase, kraken, bitstamp, gemini, bitfinex]
+    method: median
+```
 
-Considerations when selecting sources:
-- **Redundancy** — Use at least 5 sources; the oracle takes the median
-- **Rate limits** — Public APIs may throttle you; use timeouts and handle failures gracefully
-- **Latency** — Slower sources add response time; set aggressive timeouts (5s per source)
-- **Geographic diversity** — Mix US and EU exchanges to reduce correlated failures
+## Step 6: Configure L402 Proxy
 
-### Pricing Your Data
+Edit `~/myceliasignal/l402-proxy/main.go` to set your LND connection and route pricing:
 
-Prices are configured in the L402 proxy's route map (`main.go`):
 ```go
+// LND connection
+lndREST  = "https://YOURNODE.m.voltageapp.io:8080"
+
+// Route pricing (sats)
+var freeRoutes = map[string]bool{
+    "/oracle/price/btc/usd/preview": true,
+    // ... all preview routes
+}
+
 var routes = map[string]Route{
-    "/oracle/btcusd":      {Backend: "http://127.0.0.1:9100", Price: 10},
-    "/oracle/btcusd/vwap": {Backend: "http://127.0.0.1:9101", Price: 20},
-    "/oracle/solusd":      {Backend: "http://127.0.0.1:9107", Price: 10},
+    "/oracle/price/btc/usd":      {Backend: "http://127.0.0.1:9200/oracle/price/btc/usd",      Price: 10},
+    "/oracle/price/btc/usd/vwap": {Backend: "http://127.0.0.1:9200/oracle/price/btc/usd/vwap", Price: 20},
+    "/oracle/econ/us/cpi":        {Backend: "http://127.0.0.1:9129/oracle/econ/us/cpi",        Price: 1000},
+    // ... all routes
 }
 ```
 
-Pricing considerations:
-- Too cheap and you don't cover costs
-- Too expensive and clients choose other oracles
-- More computation or better data justifies higher prices (VWAP > spot, DLC attestation > spot)
-- The market will tell you — if query volume drops, your price is too high
-
-## Step 4: Configure the L402 Proxy
-
-Edit `main.go` to set your LND connection details:
+Macaroon security — add path and expiry caveats:
 ```go
-var (
-    lndREST     = "https://YOURNODE.m.voltageapp.io:8080"
-    macaroonHex string
-    rootKey     []byte
-)
+// Path caveat: macaroon only valid for the endpoint it was purchased for
+// Expiry caveat: 30 seconds from issue
 ```
 
-Update credential paths in `main()`:
-```go
-macData, err := os.ReadFile("/home/YOUR_USER/slo/creds/admin.macaroon")
-rootKeyPath := "/home/YOUR_USER/slo/creds/l402_root_key.bin"
+## Step 7: Configure x402 Proxy
+
+Edit `~/myceliasignal/x402_proxy.py` to set pricing (in USDC):
+
+```python
+PAID_ROUTES = {
+    "/oracle/price/btc/usd":      {"backend": f"{PRICE_BACKEND}/oracle/price/btc/usd",      "price_usd": 0.01},
+    "/oracle/price/btc/usd/vwap": {"backend": f"{PRICE_BACKEND}/oracle/price/btc/usd/vwap", "price_usd": 0.02},
+    "/oracle/econ/us/cpi":        {"backend": f"{ECON_US_BACKEND}/oracle/econ/us/cpi",       "price_usd": 1.00},
+    # ... all routes
+}
 ```
 
-The proxy generates an L402 root key on first run and persists it to disk. This key mints and verifies all macaroons — back it up.
+## Step 8: Configure nginx
 
-Rebuild after any changes:
+```nginx
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+
+    # x402 proxy
+    location /oracle/ {
+        proxy_pass http://127.0.0.1:8402;
+        add_header Access-Control-Allow-Origin *;
+    }
+
+    # L402 proxy
+    location /l402/ {
+        proxy_pass http://127.0.0.1:8080;
+        add_header Access-Control-Allow-Origin *;
+    }
+
+    # DLC oracle
+    location /dlc/ {
+        proxy_pass http://127.0.0.1:9104;
+        add_header Access-Control-Allow-Origin *;
+    }
+}
+```
+
+## Step 9: Systemd Services
+
+Example unit file — repeat for each service:
+
 ```bash
-cd ~/slo-l402-proxy
-go build -o slo-l402-proxy .
-```
-
-## Step 5: Launch
-```bash
-# Start oracles
-python3 ~/slo/oracle/liveoracle_btcusd_spot.py &
-python3 ~/slo/oracle/liveoracle_btcusd_vwap.py &
-python3 ~/slo/oracle/liveoracle_ethusd_spot.py &
-python3 ~/slo/oracle/liveoracle_eurusd_spot.py &
-python3 ~/slo/oracle/liveoracle_xauusd_spot.py &
-python3 ~/slo/oracle/liveoracle_btceur_spot.py &
-python3 ~/slo/oracle/liveoracle_solusd_spot.py &
-
-# Start L402 proxy
-~/slo-l402-proxy/slo-l402-proxy &
-```
-
-### Verify
-```bash
-curl -v http://localhost:8080/oracle/btcusd
-# Should return 402 with a Lightning invoice
-```
-
-## Step 6: Keep It Running
-
-Use systemd to survive reboots and SSH disconnects:
-```bash
-sudo tee /etc/systemd/system/slo-btcusd-spot.service << 'EOF'
+sudo tee /etc/systemd/system/myceliasignal-price-service.service << 'EOF'
 [Unit]
-Description=SLO BTCUSD Spot Oracle
+Description=Mycelia Signal Price Service
 After=network.target
 
 [Service]
 User=YOUR_USER
-WorkingDirectory=/home/YOUR_USER/slo
-ExecStart=/usr/bin/python3 /home/YOUR_USER/slo/oracle/liveoracle_btcusd_spot.py
-Restart=always
+WorkingDirectory=/home/YOUR_USER/myceliasignal/price-service
+ExecStart=/home/YOUR_USER/myceliasignal/price-service/price-service
+Restart=on-failure
 RestartSec=5
 
 [Install]
@@ -201,18 +244,42 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable slo-btcusd-spot
-sudo systemctl start slo-btcusd-spot
+sudo systemctl enable myceliasignal-price-service
+sudo systemctl start myceliasignal-price-service
 ```
 
-Repeat for each oracle and the L402 proxy.
+## Step 10: Verify
+
+```bash
+# Health check
+curl http://localhost:9200/health
+
+# Preview (free, no payment)
+curl https://api.yourdomain.com/oracle/price/btc/usd/preview | jq .
+
+# Paid endpoint — should return 402
+curl -v https://api.yourdomain.com/oracle/price/btc/usd
+
+# L402 paid endpoint — should return 402 with invoice
+curl -v https://api.yourdomain.com/l402/oracle/price/btc/usd
+```
 
 ## Monitoring
 
-### Check oracle health
+### Service status
 ```bash
-curl http://localhost:9100/health  # BTCUSD
-curl http://localhost:9107/health  # SOLUSD
+sudo systemctl status myceliasignal-price-service
+sudo journalctl -u myceliasignal-price-service -f
+```
+
+### Revenue database
+```bash
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('~/myceliasignal/revenue.db')
+for row in conn.execute('SELECT rail, recorded_at, amount_usdc, endpoint FROM revenue ORDER BY id DESC LIMIT 20'):
+    print(row)
+"
 ```
 
 ### Check channel balance
@@ -221,43 +288,59 @@ curl -k --header "Grpc-Metadata-macaroon: YOUR_HEX_MACAROON" \
   https://YOURNODE.m.voltageapp.io:8080/v1/balance/channels
 ```
 
-### Check earnings
-```bash
-curl -k --header "Grpc-Metadata-macaroon: YOUR_HEX_MACAROON" \
-  https://YOURNODE.m.voltageapp.io:8080/v1/invoices?reversed=true&num_max_invoices=10
+### Common issues
+
+- **Price service returning errors** — Exchange APIs may be down; check logs, verify sources
+- **L402 proxy not starting** — Check macaroon path and LND REST connection
+- **x402 CDP verification failing** — Verify CDP credentials in systemd env, check payment address
+- **No payments arriving** — Check inbound Lightning liquidity; channel may need rebalancing
+- **High memory usage** — econ services are lightweight; price-service needs ~200MB for all pairs
+
+## Pricing Your Data
+
+```
+Spot/FX/metals:          10 sats  /  $0.01 USDC
+VWAP:                    20 sats  /  $0.02 USDC
+Economic indicators:  1,000 sats  /  $1.00 USDC
+DLC registrations:   10,000 sats  /  $7.00 USDC
 ```
 
-### Watch for problems
-
-- **Oracle returning errors** — Exchange APIs may be down; check logs
-- **L402 proxy not starting** — Usually a macaroon path or LND connection issue
-- **No payments arriving** — Check inbound liquidity; channel may be depleted
-- **Channel force-closed** — Peer went offline; need to open a new channel
-
-## Adding New Data Types
-
-To create a new oracle (e.g., a new trading pair):
-
-1. Create the feed: `oracle/feeds/newpair.py` — fetch from exchanges, compute median
-2. Create the oracle server: `oracle/liveoracle_newpair_spot.py` — FastAPI, sign canonical message, run on next available port
-3. Add the route to `main.go`: `"/oracle/newpair": {Backend: "http://127.0.0.1:910X", Price: 10},`
-4. Rebuild the proxy: `go build -o slo-l402-proxy .`
-5. Start the oracle, restart the proxy
-
-The protocol is data-agnostic. Any verifiable assertion can be sold this way — prices, rates, weather, election results, sports scores. If a client will pay for it and you can sign it, it's an oracle.
+Considerations:
+- More computation or better data justifies higher prices (VWAP > spot, econ > spot)
+- Align L402 and x402 pricing — clients should not strongly prefer one rail on price alone
+- Preview endpoints (free) drive discovery and adoption
 
 ## Economics
 
-A rough model for an SLO instance running 8 oracle endpoints:
+A rough model running the full Mycelia Signal stack:
 
 | Item | Monthly Cost |
-|---|---|
-| GCP e2-small VM | $15 |
-| Voltage Standard node | $27 |
-| **Total operating cost** | **$42** |
+|------|-------------|
+| GCP e2-medium VM (×2 GCs) | ~$60 |
+| Voltage Standard node | ~$27 |
+| **Total operating cost** | **~$87** |
 
-At 10 sats per query (~$0.007):
-- **Break even:** ~6,000 queries/month (~200/day)
-- **At 1,000 queries/day:** ~$210/month revenue, ~$168 profit
+At blended 10–20 sats per query (~$0.008 average):
+- **Break even:** ~10,900 queries/month (~360/day)
+- **At 1,000 queries/day:** ~$240/month revenue, ~$153 profit
 
-The real value comes from serving multiple data types on the same infrastructure. Each new oracle endpoint is incremental revenue on the same fixed costs. Adding SOL/USD to an existing BTC/USD setup costs zero additional infrastructure — just a new Python file and a one-line proxy route.
+Econ and DLC queries at higher prices dramatically improve economics. A single DLC registration (10,000 sats, ~$7) equals ~875 spot price queries in revenue.
+
+## Adding New Data Types
+
+1. Create a new Go service (or Python FastAPI service) on the next available port
+2. Implement the canonical string format: `v1|PRICE|PAIR|VALUE|CURRENCY|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE`
+3. Add the route to both `l402-proxy/main.go` and `x402_proxy.py`
+4. Add a preview route returning unsigned cached data
+5. Add a nginx location block
+6. Create a systemd unit and enable it
+
+The stack is data-agnostic. Any verifiable assertion can be sold this way.
+
+## Resources
+
+- Docs: https://myceliasignal.com/docs
+- Public repo: https://github.com/jonathanbulkeley/Mycelia-Signal-Sovereign-Oracle
+- OpenAPI spec: https://myceliasignal.com/openapi.json
+- x402 spec: https://github.com/coinbase/x402
+- L402 spec: https://docs.lightning.engineering/the-lightning-network/l402
