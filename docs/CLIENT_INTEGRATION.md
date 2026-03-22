@@ -1,318 +1,413 @@
-# Client Integration Guide
+# Mycelia Signal — Client Integration Guide
 
-How to consume SLO oracle data in your application.
+How to consume Mycelia Signal oracle data in your application.
 
-## Overview
+**Base URL:** `https://api.myceliasignal.com`  
+**Docs:** https://myceliasignal.com/docs  
+**56 endpoints** — crypto, FX, economic indicators, commodities
 
-SLO uses the L402 protocol (formerly LSAT) to gate data behind Lightning micropayments. Your client needs to:
+---
 
-1. Make an HTTP request
-2. Handle the 402 response
-3. Pay the Lightning invoice
-4. Retry with proof of payment
-5. Verify the signature on the returned data
+## Payment Rails
 
-## Quick Start: lnget
+### L402 — Lightning Network
 
-The fastest way to integrate. [lnget](https://github.com/lightninglabs/lnget) handles the entire L402 flow in one command:
-```bash
-# Install
-go install github.com/lightninglabs/lnget@latest
+Pay Lightning sats, receive secp256k1 ECDSA-signed attestations.
 
-# Configure (one time)
-lnget config init
-# Edit ~/.lnget/config.yaml with your LND credentials
+- Spot/FX/metals: **10 sats**
+- VWAP: **20 sats**
+- Economic indicators / commodities: **1,000 sats**
 
-# Fetch signed price data
-lnget -k -q http://104.197.109.246:8080/oracle/btcusd | jq .
+### x402 — USDC on Base
+
+Pay USDC on Base L2, receive Ed25519-signed attestations.
+
+- Spot/FX/metals: **$0.01 USDC**
+- VWAP: **$0.02 USDC**
+- Economic indicators / commodities: **$1.00 USDC**
+
+### Preview (Free)
+
+All endpoints have a free preview route that returns unsigned, cached data:
+
 ```
-
-lnget caches L402 tokens, so repeated requests to the same endpoint reuse the token until it expires.
-
-## Python Integration
-
-### With lnget (subprocess)
-
-Simplest approach — shell out to lnget and parse the JSON:
-```python
-import json
-import subprocess
-
-def fetch_oracle(url: str) -> dict:
-    result = subprocess.run(
-        ["lnget", "-k", "-q", url],
-        capture_output=True, text=True, timeout=60
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"lnget failed: {result.stderr.strip()}")
-    return json.loads(result.stdout)
-
-data = fetch_oracle("http://104.197.109.246:8080/oracle/btcusd")
-print(f"BTCUSD: {data['canonical'].split('|')[2]}")
-```
-
-### Native Python (manual L402 flow)
-
-For full control without external dependencies:
-```python
-import requests
-import re
-import hashlib
-import base64
-from ecdsa import VerifyingKey, SECP256k1
-
-ORACLE_URL = "http://104.197.109.246:8080/oracle/btcusd"
-
-def fetch_with_l402(url: str, pay_invoice_func) -> dict:
-    """
-    Full L402 flow:
-    1. GET the URL
-    2. Parse 402 response for macaroon + invoice
-    3. Pay the invoice (you provide the payment function)
-    4. Retry with L402 token
-    5. Return the data
-    """
-    # Step 1: Initial request
-    r = requests.get(url)
-
-    if r.status_code != 402:
-        return r.json()
-
-    # Step 2: Parse the L402 challenge
-    auth_header = r.headers.get("Www-Authenticate", "")
-    macaroon_match = re.search(r'macaroon="([^"]+)"', auth_header)
-    invoice_match = re.search(r'invoice="([^"]+)"', auth_header)
-
-    if not macaroon_match or not invoice_match:
-        raise RuntimeError("Could not parse L402 challenge")
-
-    macaroon = macaroon_match.group(1)
-    invoice = invoice_match.group(1)
-
-    # Step 3: Pay the invoice
-    # pay_invoice_func should return the preimage (hex string)
-    preimage = pay_invoice_func(invoice)
-
-    # Step 4: Retry with L402 token
-    token = f"L402 {macaroon}:{preimage}"
-    r2 = requests.get(url, headers={"Authorization": token})
-
-    if r2.status_code != 200:
-        raise RuntimeError(f"L402 retry failed: {r2.status_code}")
-
-    return r2.json()
-
-
-def verify_response(data: dict) -> bool:
-    """Verify the secp256k1 signature on the canonical message."""
-    try:
-        canonical = data["canonical"]
-        sig_bytes = base64.b64decode(data["signature"])
-        pubkey_bytes = bytes.fromhex(data["pubkey"])
-
-        vk = VerifyingKey.from_string(pubkey_bytes, curve=SECP256k1)
-        h = hashlib.sha256(canonical.encode()).digest()
-        return vk.verify_digest(sig_bytes, h)
-    except Exception:
-        return False
-```
-
-### Payment Function Examples
-
-The `pay_invoice_func` depends on how you connect to Lightning:
-```python
-# Via LND REST API
-def pay_via_lnd(invoice: str) -> str:
-    import base64 as b64
-    mac_hex = open("admin.macaroon", "rb").read().hex()
-    r = requests.post(
-        "https://YOUR_NODE:8080/v1/channels/transactions",
-        headers={"Grpc-Metadata-macaroon": mac_hex},
-        json={"payment_request": invoice},
-        verify=False
-    )
-    data = r.json()
-    preimage_b64 = data["payment_preimage"]
-    return b64.b64decode(preimage_b64).hex()
-
-# Via lncli
-def pay_via_lncli(invoice: str) -> str:
-    result = subprocess.run(
-        ["lncli", "payinvoice", "--force", invoice],
-        capture_output=True, text=True
-    )
-    # Parse preimage from output
-    for line in result.stdout.split("\n"):
-        if "preimage" in line.lower():
-            return line.split(":")[-1].strip()
-```
-
-## JavaScript / Node.js Integration
-```javascript
-const https = require('https');
-
-async function fetchOracle(url) {
-  // Step 1: Initial request
-  const res = await fetch(url);
-
-  if (res.status !== 402) {
-    return await res.json();
-  }
-
-  // Step 2: Parse L402 challenge
-  const authHeader = res.headers.get('www-authenticate');
-  const macaroon = authHeader.match(/macaroon="([^"]+)"/)[1];
-  const invoice = authHeader.match(/invoice="([^"]+)"/)[1];
-
-  // Step 3: Pay invoice (implement with your Lightning library)
-  const preimage = await payInvoice(invoice);
-
-  // Step 4: Retry with token
-  const res2 = await fetch(url, {
-    headers: { 'Authorization': `L402 ${macaroon}:${preimage}` }
-  });
-
-  return await res2.json();
-}
-
-// Verify signature (using secp256k1 library)
-const crypto = require('crypto');
-const secp256k1 = require('secp256k1');
-
-function verifyResponse(data) {
-  const hash = crypto.createHash('sha256')
-    .update(data.canonical)
-    .digest();
-  const sig = Buffer.from(data.signature, 'base64');
-  const pubkey = Buffer.from(data.pubkey, 'hex');
-  return secp256k1.ecdsaVerify(sig, hash, pubkey);
-}
-```
-
-## Go Integration
-```go
-package main
-
-import (
-    "crypto/sha256"
-    "encoding/base64"
-    "encoding/hex"
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
-    "regexp"
-
-    "github.com/btcsuite/btcd/btcec/v2/ecdsa"
-    "github.com/btcsuite/btcd/btcec/v2"
-)
-
-type OracleResponse struct {
-    Domain    string `json:"domain"`
-    Canonical string `json:"canonical"`
-    Signature string `json:"signature"`
-    Pubkey    string `json:"pubkey"`
-}
-
-func verifyResponse(resp OracleResponse) bool {
-    hash := sha256.Sum256([]byte(resp.Canonical))
-    sigBytes, _ := base64.StdEncoding.DecodeString(resp.Signature)
-    pubBytes, _ := hex.DecodeString(resp.Pubkey)
-
-    pubKey, _ := btcec.ParsePubKey(pubBytes)
-    sig, _ := ecdsa.ParseDERSignature(sigBytes)
-
-    return sig.Verify(hash[:], pubKey)
-}
-```
-
-## Parsing the Canonical Message
-
-Every response includes a pipe-delimited canonical string:
-```
-v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|coinbase,kraken,bitstamp|median
-```
-
-Parse it in any language:
-```python
-parts = canonical.split("|")
-version   = parts[0]  # "v1"
-pair      = parts[1]  # "BTCUSD"
-price     = parts[2]  # "96482.15"
-currency  = parts[3]  # "USD"
-decimals  = parts[4]  # "2"
-timestamp = parts[5]  # "2026-02-13T18:44:30Z"
-nonce     = parts[6]  # "890123"
-sources   = parts[7]  # "coinbase,kraken,bitstamp"
-method    = parts[8]  # "median"
-```
-
-## Quorum Pattern
-
-For production use, query multiple oracles and aggregate:
-```python
-import statistics
-
-ORACLES = [
-    "http://104.197.109.246:8080/oracle/btcusd",       # 10 sats
-    "http://104.197.109.246:8080/oracle/btcusd/vwap",   # 20 sats
-    # Add third-party SLO operators here as they come online
-]
-
-MIN_RESPONSES = 2
-MAX_DEVIATION_PCT = 0.5
-
-prices = []
-for url in ORACLES:
-    data = fetch_oracle(url)             # your L402 fetch function
-    if verify_response(data):            # signature check
-        price = float(data["canonical"].split("|")[2])
-        prices.append(price)
-
-if len(prices) >= MIN_RESPONSES:
-    median = statistics.median(prices)
-    # Check coherence
-    for p in prices:
-        if abs(p - median) / median * 100 > MAX_DEVIATION_PCT:
-            raise ValueError("Price divergence detected")
-    print(f"Trusted price: ${median:.2f}")
-```
-
-The quorum pattern means no single oracle can deceive you. As more operators come online, you add their URLs to your list and increase `MIN_RESPONSES`.
-
-## Error Handling
-
-| HTTP Status | Meaning | Action |
-|---|---|---|
-| 402 | Payment required | Parse invoice, pay, retry with token |
-| 200 | Success | Verify signature, parse data |
-| 500 | Oracle error | Exchange API failure; retry or skip |
-| Connection timeout | Server down | Skip this oracle, proceed with others |
-
-## Cost Management
-
-- Spot query (BTC, ETH, EUR, XAU, BTC/EUR, SOL): **10 sats** (~$0.007)
-- VWAP query: **20 sats** (~$0.014)
-- DLC attestation: **1000 sats** (~$0.70)
-- Full quorum (spot + VWAP): **30 sats** (~$0.021)
-
-At 1 query per minute, 24/7:
-- Spot only: ~432,000 sats/month (~$290)
-- Full quorum: ~1,296,000 sats/month (~$870)
-
-lnget caches tokens, so repeated requests within the token validity window don't require new payments.
-
-## Security Considerations
-
-1. **Always verify signatures.** Never trust data without checking the secp256k1 signature against the pubkey.
-2. **Pin pubkeys.** Once you trust an oracle, store its pubkey and reject responses signed by different keys.
-3. **Use quorum.** A single oracle can lie. Two independent oracles lying in the same direction is much harder.
-4. **Check timestamps.** Reject assertions older than your staleness threshold (e.g., 60 seconds).
-5. **Monitor deviation.** If oracles start diverging beyond your threshold, halt and investigate.
+GET https://api.myceliasignal.com/oracle/price/btc/usd/preview
+GET https://api.myceliasignal.com/oracle/econ/us/cpi/preview
 ```
 
 ---
 
-Add that to `docs/CLIENT_INTEGRATION.md`. How's the channel looking?
+## Endpoint Format
+
 ```
-curl -k --header "Grpc-Metadata-macaroon: %MAC%" https://mycelia.m.voltageapp.io:8080/v1/channels/pending
+# Price endpoints
+GET /oracle/price/{base}/{quote}
+GET /oracle/price/{base}/{quote}/vwap
+
+# Economic indicators
+GET /oracle/econ/us/{indicator}
+GET /oracle/econ/eu/{indicator}
+GET /oracle/econ/commodities/{indicator}
+
+# L402 prefix (Lightning payment)
+GET /l402/oracle/price/{base}/{quote}
+GET /l402/oracle/econ/us/{indicator}
+```
+
+Examples:
+```
+/oracle/price/btc/usd          BTC/USD spot
+/oracle/price/btc/usd/vwap     BTC/USD 5-min VWAP
+/oracle/price/eur/usd          EUR/USD
+/oracle/econ/us/cpi            US CPI
+/oracle/econ/eu/hicp           EU HICP
+/oracle/econ/commodities/wti   WTI Crude Oil
+```
+
+---
+
+## Python — x402 (USDC on Base)
+
+```python
+import httpx
+import base64
+import json
+import os
+from eth_account import Account
+from eth_account.messages import encode_defunct
+
+API_BASE = "https://api.myceliasignal.com"
+PRIVATE_KEY = os.environ["ETH_PRIVATE_KEY"]
+
+def fetch_oracle_x402(endpoint: str) -> dict:
+    # Step 1: Request to get 402 + payment requirements
+    r = httpx.get(f"{API_BASE}{endpoint}")
+    if r.status_code != 402:
+        return r.json()
+
+    body = r.json()
+    req = body["accepts"][0]
+
+    # Step 2: Build and sign EIP-3009 transferWithAuthorization
+    # (See x402 docs for full EIP-712 signing implementation)
+    # https://myceliasignal.com/docs/x402
+
+    # Step 3: Encode payment and retry
+    payment_payload = { ... }  # See docs for full structure
+    x_payment = base64.b64encode(json.dumps(payment_payload).encode()).decode()
+
+    r2 = httpx.get(f"{API_BASE}{endpoint}", headers={"X-PAYMENT": x_payment})
+    return r2.json()
+
+data = fetch_oracle_x402("/oracle/price/btc/usd")
+```
+
+---
+
+## Python — L402 (Lightning)
+
+```python
+import httpx
+import re
+
+API_BASE = "https://api.myceliasignal.com"
+
+def fetch_oracle_l402(endpoint: str, pay_invoice_fn) -> dict:
+    """
+    pay_invoice_fn: callable that takes a Lightning invoice string
+                    and returns the payment preimage hex string
+    """
+    # Step 1: Request to get 402 + invoice
+    r = httpx.get(f"{API_BASE}/l402{endpoint}")
+    if r.status_code != 402:
+        return r.json()
+
+    # Parse macaroon and invoice from WWW-Authenticate header
+    www_auth = r.headers.get("WWW-Authenticate", "")
+    macaroon_match = re.search(r'macaroon="([^"]+)"', www_auth)
+    invoice_match = re.search(r'invoice="([^"]+)"', www_auth)
+
+    if not macaroon_match or not invoice_match:
+        body = r.json()
+        macaroon = body.get("macaroon")
+        invoice = body.get("invoice")
+    else:
+        macaroon = macaroon_match.group(1)
+        invoice = invoice_match.group(1)
+
+    # Step 2: Pay the invoice
+    preimage = pay_invoice_fn(invoice)
+
+    # Step 3: Retry with L402 credentials
+    r2 = httpx.get(
+        f"{API_BASE}/l402{endpoint}",
+        headers={"Authorization": f"L402 {macaroon}:{preimage}"}
+    )
+    return r2.json()
+
+# Example with lnget or any Lightning wallet integration
+data = fetch_oracle_l402("/oracle/price/btc/usd", pay_invoice_fn=your_wallet.pay)
+```
+
+---
+
+## Parsing the Response
+
+### Price response (PRICE canonical)
+
+```python
+def parse_price_response(data: dict) -> dict:
+    # canonical field for price endpoints
+    canonical = data.get("canonical") or data.get("canonicalstring", "")
+    parts = canonical.split("|")
+
+    # Spec v0.4: v1|PRICE|PAIR|VALUE|CURRENCY|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE
+    return {
+        "version":   parts[0],   # "v1"
+        "type":      parts[1],   # "PRICE"
+        "pair":      parts[2],   # "BTCUSD"
+        "price":     parts[3],   # "84231.50"
+        "currency":  parts[4],   # "USD"
+        "decimals":  parts[5],   # "2"
+        "sources":   parts[6].split(","),  # ["binance","coinbase",...]
+        "method":    parts[7],   # "median"
+        "timestamp": parts[8],   # "1741521600"
+        "nonce":     parts[9],   # "562204"
+        "signature": data.get("signature"),
+        "pubkey":    data.get("pubkey"),
+    }
+
+data = fetch_oracle_x402("/oracle/price/btc/usd")
+parsed = parse_price_response(data)
+print(f"BTC/USD: {parsed['price']} {parsed['currency']}")
+print(f"Sources: {', '.join(parsed['sources'])}")
+print(f"Timestamp: {parsed['timestamp']}")
+```
+
+### Economic indicator response (ECON canonical)
+
+```python
+def parse_econ_response(data: dict) -> dict:
+    # econ endpoints use "canonicalstring" not "canonical"
+    canonical = data.get("canonicalstring") or data.get("canonical", "")
+    parts = canonical.split("|")
+
+    # Spec v0.4: v1|ECON|REGION|INDICATOR|VALUE|UNIT|PERIOD|VINTAGEDATE|SOURCEAGENCY|SERIESID|SOURCEMODEL|TIMESTAMP|NONCE
+    return {
+        "version":       parts[0],   # "v1"
+        "type":          parts[1],   # "ECON"
+        "region":        parts[2],   # "US"
+        "indicator":     parts[3],   # "CPI"
+        "value":         parts[4],   # "326.785"
+        "unit":          parts[5],   # "index198284100"
+        "period":        parts[6],   # "2026-02"
+        "vintagedate":   parts[7],   # "2026-03-21"
+        "sourceagency":  parts[8],   # "BLS"
+        "seriesid":      parts[9],   # "CUUR0000SA0"
+        "sourcemodel":   parts[10],  # "directapi"
+        "timestamp":     parts[11],  # "1774087200"
+        "nonce":         parts[12],  # "631660"
+    }
+
+data = fetch_oracle_x402("/oracle/econ/us/cpi")
+parsed = parse_econ_response(data)
+print(f"US CPI: {parsed['value']} {parsed['unit']} ({parsed['period']})")
+```
+
+---
+
+## JavaScript / TypeScript
+
+```typescript
+const API_BASE = "https://api.myceliasignal.com";
+
+interface PriceAttestation {
+    pair: string;
+    price: string;
+    currency: string;
+    sources: string[];
+    timestamp: string;
+    signature: string;
+    pubkey: string;
+}
+
+function parseCanonical(data: any): PriceAttestation {
+    const canonical: string = data.canonical ?? data.canonicalstring ?? "";
+    const parts = canonical.split("|");
+    const type = parts[1];
+
+    if (type === "PRICE") {
+        // v1|PRICE|PAIR|VALUE|CURRENCY|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE
+        return {
+            pair:      parts[2],
+            price:     parts[3],
+            currency:  parts[4],
+            sources:   parts[6]?.split(",") ?? [],
+            timestamp: parts[8],
+            signature: data.signature,
+            pubkey:    data.pubkey,
+        };
+    } else {
+        // ECON: v1|ECON|REGION|INDICATOR|VALUE|UNIT|...|TIMESTAMP|NONCE
+        return {
+            pair:      `${parts[2]}/${parts[3]}`,
+            price:     parts[4],
+            currency:  parts[5],
+            sources:   [parts[8] ?? ""],
+            timestamp: parts[11],
+            signature: data.signature,
+            pubkey:    data.pubkey,
+        };
+    }
+}
+
+// Preview (free, no payment)
+const preview = await fetch(`${API_BASE}/oracle/price/btc/usd/preview`);
+const data = await preview.json();
+const parsed = parseCanonical(data);
+console.log(`BTC/USD: ${parsed.price} (preview, unsigned)`);
+```
+
+---
+
+## Go
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+    "strings"
+)
+
+const APIBase = "https://api.myceliasignal.com"
+
+type OracleResponse struct {
+    Canonical       string `json:"canonical"`
+    CanonicalString string `json:"canonicalstring"`
+    Signature       string `json:"signature"`
+    Pubkey          string `json:"pubkey"`
+}
+
+type ParsedAttestation struct {
+    Pair      string
+    Price     string
+    Currency  string
+    Sources   []string
+    Timestamp string
+    Signature string
+    Pubkey    string
+}
+
+func ParseCanonical(resp OracleResponse) ParsedAttestation {
+    canonical := resp.Canonical
+    if canonical == "" {
+        canonical = resp.CanonicalString
+    }
+    parts := strings.Split(canonical, "|")
+
+    // PRICE: v1|PRICE|PAIR|VALUE|CURRENCY|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE
+    if len(parts) >= 10 && parts[1] == "PRICE" {
+        return ParsedAttestation{
+            Pair:      parts[2],
+            Price:     parts[3],
+            Currency:  parts[4],
+            Sources:   strings.Split(parts[6], ","),
+            Timestamp: parts[8],
+            Signature: resp.Signature,
+            Pubkey:    resp.Pubkey,
+        }
+    }
+
+    // ECON: v1|ECON|REGION|INDICATOR|VALUE|UNIT|...|TIMESTAMP|NONCE
+    return ParsedAttestation{
+        Pair:      parts[2] + "/" + parts[3],
+        Price:     parts[4],
+        Currency:  parts[5],
+        Sources:   []string{parts[8]},
+        Timestamp: parts[11],
+        Signature: resp.Signature,
+        Pubkey:    resp.Pubkey,
+    }
+}
+
+func fetchPreview(endpoint string) (*ParsedAttestation, error) {
+    r, err := http.Get(APIBase + endpoint + "/preview")
+    if err != nil {
+        return nil, err
+    }
+    defer r.Body.Close()
+    body, _ := io.ReadAll(r.Body)
+
+    var resp OracleResponse
+    if err := json.Unmarshal(body, &resp); err != nil {
+        return nil, err
+    }
+    parsed := ParseCanonical(resp)
+    return &parsed, nil
+}
+
+func main() {
+    data, err := fetchPreview("/oracle/price/btc/usd")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("BTC/USD: %s %s\n", data.Price, data.Currency)
+    fmt.Printf("Sources: %s\n", strings.Join(data.Sources, ", "))
+}
+```
+
+---
+
+## Signature Verification
+
+See the full verification guide at https://myceliasignal.com/docs/verification
+
+**Signing process (both protocols):**
+1. UTF-8 encode the canonical string
+2. SHA-256 hash the encoded bytes
+3. Sign the hash
+
+**L402 responses:** secp256k1 ECDSA, DER-encoded, base64  
+**x402 responses:** Ed25519, raw 64 bytes, base64
+
+```python
+import hashlib
+import base64
+from coincurve import PublicKey  # secp256k1 (L402)
+# from nacl.signing import VerifyKey  # Ed25519 (x402)
+
+def verify_l402(data: dict) -> bool:
+    canonical = (data.get("canonical") or data.get("canonicalstring", "")).encode("utf-8")
+    digest = hashlib.sha256(canonical).digest()
+    sig = base64.b64decode(data["signature"])
+    pubkey = PublicKey(bytes.fromhex(data["pubkey"]))
+    return pubkey.verify(sig, digest, hasher=None)
+```
+
+---
+
+## Public Keys
+
+| Instance | Protocol | Key |
+|----------|----------|-----|
+| US GC    | L402 (secp256k1) | `03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf` |
+| Asia GC  | L402 (secp256k1) | `02b1377c30c7dcfcba428cf299c18782856a12eb4fab32b87081460f4ba2deab73` |
+| US GC    | x402 (Ed25519)   | `f4f0e52b5f7b54831f965632bf1ebf72769beda4c4e3d36a593f7729ec812615` |
+| Asia GC  | x402 (Ed25519)   | `7ab07fbe7d08cd16823e5eb0db0e21f3f38e9366d5fd00d14e95df0fb9b51a1a` |
+
+All keys at https://myceliasignal.com/docs/keys
+
+---
+
+## Resources
+
+- Full docs: https://myceliasignal.com/docs
+- x402 integration: https://myceliasignal.com/docs/x402
+- L402 integration: https://myceliasignal.com/docs/l402
+- Signature verification: https://myceliasignal.com/docs/verification
+- All endpoints: https://myceliasignal.com/docs/endpoints
+- OpenAPI spec: https://myceliasignal.com/openapi.json
