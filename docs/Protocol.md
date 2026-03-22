@@ -1,226 +1,304 @@
-# SLO Protocol Specification (v1)
+# Mycelia Signal Protocol Specification (v1)
 
 ## Purpose
 
-SLO defines a protocol for purchasing signed data assertions over HTTP, gated by Lightning micropayments via L402. The protocol is deliberately minimal: it specifies a canonical message format, a signing scheme, and a payment mechanism. Everything else — source selection, aggregation, trust — is the client's responsibility.
+Mycelia Signal defines a protocol for purchasing signed data attestations over HTTP, gated by micropayments via L402 (Lightning) or x402 (USDC on Base). The protocol specifies a canonical message format, two signing schemes, and two payment mechanisms. Source selection, aggregation, and trust are the client's responsibility.
 
 ## Canonical Message Format
 
-Every oracle response contains a canonical string that is the sole input to the signing function:
-```
-v1|<pair>|<value>|<currency>|<decimals>|<timestamp>|<nonce>|<sources>|<method>
-```
+Every oracle response contains a canonical string that is the sole input to the signing function. The format varies by data type.
 
-### Fields
+### PRICE type (crypto pairs, FX, precious metals)
+
+```
+v1|PRICE|PAIR|VALUE|CURRENCY|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE
+```
 
 | Field | Type | Description | Example |
-|---|---|---|---|
+|-------|------|-------------|---------|
 | version | string | Protocol version | `v1` |
-| pair | string | Asset pair identifier | `BTCUSD` |
-| value | string | Price value (string, not float) | `96482.15` |
+| type | string | Message type | `PRICE` |
+| pair | string | Asset pair (no separator) | `BTCUSD` |
+| value | string | Price (exact decimal string) | `84231.50` |
 | currency | string | Quote currency | `USD` |
-| decimals | integer | Decimal precision of value | `2` |
-| timestamp | string | ISO 8601 UTC timestamp | `2026-02-13T18:44:30Z` |
-| nonce | string | Unique identifier per assertion | `890123` |
-| sources | string | Comma-separated data sources | `coinbase,kraken,bitstamp` |
+| decimals | integer | Decimal places | `2` |
+| sources | string | Comma-separated, lowercase | `binance,coinbase,kraken` |
 | method | string | Aggregation method | `median` or `vwap` |
+| timestamp | integer | Unix timestamp (UTC) | `1741514400` |
+| nonce | integer | Random per-request integer | `482910` |
+
+**Example:**
+```
+v1|PRICE|BTCUSD|84231.50|USD|2|binance,bitstamp,coinbase,kraken,okx|median|1741514400|482910
+```
+
+### ECON types (economic indicators and commodities)
+
+```
+v1|ECON|REGION|INDICATOR|VALUE|UNIT|PERIOD|VINTAGEDATE|SOURCEAGENCY|SERIESID|SOURCEMODEL|TIMESTAMP|NONCE
+```
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| version | Protocol version | `v1` |
+| type | Always `ECON` | `ECON` |
+| region | `US`, `EU`, or `COMMODITIES` | `US` |
+| indicator | Indicator code | `CPI` |
+| value | Decimal string | `326.785` |
+| unit | Unit of measure | `index198284100` |
+| period | Reference period | `2026-02` |
+| vintagedate | Data release date | `2026-03-21` |
+| sourceagency | Source agency | `BLS` |
+| seriesid | Series identifier | `CUUR0000SA0` |
+| sourcemodel | Retrieval method | `directapi` |
+| timestamp | Unix integer timestamp | `1774087200` |
+| nonce | Random per-request integer | `631660` |
+
+**Examples:**
+```
+v1|ECON|US|CPI|326.785|index198284100|2026-02|2026-03-21|BLS|CUUR0000SA0|directapi|1774087200|631660
+v1|ECON|EU|HICP|129.560|index2015100|2025-12|2026-03-21|Eurostat|prc_hicp_midx|directapi|1774087200|908558
+v1|ECON|COMMODITIES|WTI|93.39|usdperbarrel|2026-03-16|2026-03-21|EIA|DCOILWTICO|directapi|1774086995|905547
+```
 
 ### Rules
 
-- Fields are separated by `|` (pipe)
-- No whitespace padding
-- Price is encoded as a string with exactly `decimals` decimal places
-- Timestamp is always UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`
-- Sources are lowercase, comma-separated, alphabetically ordered
-- The canonical string is deterministic: the same inputs always produce the same string
+- Fields separated by `|` (pipe), no whitespace padding
+- Price encoded as string with exactly `decimals` decimal places
+- Timestamp is a Unix integer (seconds since epoch, UTC) — not ISO 8601
+- Sources lowercase, comma-separated
+- The canonical string is the **only** field that matters for verification
 
-### Example
-```
-v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|bitstamp,coinbase,kraken|median
-```
+---
 
-## Signing Scheme
+## Signing Schemes
 
-### Algorithm
+### L402 — secp256k1 ECDSA
 
-- Curve: **secp256k1** (same as Bitcoin)
-- Hash: **SHA-256**
-- Signature format: **DER-encoded ECDSA**
+- Curve: secp256k1
+- Hash: SHA-256
+- Process: `sign(SHA256(canonical.encode("utf-8")))`
+- Signature format: raw DER bytes, base64-encoded
+- Key format: 33-byte compressed hex
 
-### Process
-
-1. Construct the canonical string
-2. Compute `hash = SHA256(canonical.encode("utf-8"))`
-3. Sign `hash` with the oracle's secp256k1 private key
-4. Encode signature as base64
-
-### Verification
-
-1. Decode the base64 signature
-2. Decode the hex public key
-3. Compute `hash = SHA256(canonical.encode("utf-8"))`
-4. Verify the ECDSA signature against `hash` using the public key
+**Verification (Python):**
 ```python
 import hashlib, base64
-from ecdsa import VerifyingKey, SECP256k1
+from coincurve import PublicKey
 
 def verify(canonical: str, signature_b64: str, pubkey_hex: str) -> bool:
-    sig = base64.b64decode(signature_b64)
-    pubkey = bytes.fromhex(pubkey_hex)
-    vk = VerifyingKey.from_string(pubkey, curve=SECP256k1)
-    h = hashlib.sha256(canonical.encode()).digest()
-    return vk.verify_digest(sig, h)
+    msg_hash = hashlib.sha256(canonical.encode()).digest()
+    pubkey = PublicKey(bytes.fromhex(pubkey_hex))
+    return pubkey.verify(base64.b64decode(signature_b64), msg_hash, hasher=None)
 ```
+
+### x402 — Ed25519
+
+- Curve: Ed25519
+- Hash: SHA-256
+- Process: `sign(SHA256(canonical.encode("utf-8")))`
+- Key format: 32-byte hex
+
+**Verification (Python):**
+```python
+import hashlib, base64
+from nacl.signing import VerifyKey
+from nacl.encoding import RawEncoder
+
+def verify(canonical: str, signature_b64: str, pubkey_hex: str) -> bool:
+    msg_hash = hashlib.sha256(canonical.encode()).digest()
+    vk = VerifyKey(bytes.fromhex(pubkey_hex), encoder=RawEncoder)
+    try:
+        vk.verify(msg_hash, base64.b64decode(signature_b64))
+        return True
+    except Exception:
+        return False
+```
+
+---
 
 ## Response Format
 
-Oracles return JSON over HTTP:
+### Price / FX / Metals
+
 ```json
 {
   "domain": "BTCUSD",
-  "canonical": "v1|BTCUSD|96482.15|USD|2|2026-02-13T18:44:30Z|890123|bitstamp,coinbase,kraken|median",
-  "signature": "MEUCIQDr7y8Hx...",
-  "pubkey": "0220a2222aae..."
+  "canonical": "v1|PRICE|BTCUSD|84231.50|USD|2|binance,coinbase,kraken|median|1741514400|482910",
+  "signature": "<base64>",
+  "pubkey": "<hex>",
+  "signing_scheme": "secp256k1_ecdsa"
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| domain | string | Human-readable identifier for the data type |
-| canonical | string | The signed message (sole input to signature) |
-| signature | string | Base64-encoded ECDSA signature over SHA256(canonical) |
-| pubkey | string | Hex-encoded compressed secp256k1 public key of the signer |
+### Economic / Commodities
 
-The `canonical` field is the **only** field that matters for verification. All other fields are convenience metadata. A client that stores only `canonical`, `signature`, and `pubkey` can verify the assertion indefinitely.
-
-## Payment Protocol (L402)
-
-SLO uses the [L402 protocol](https://github.com/lightninglabs/L402) for payment gating, enforced by a custom Go reverse proxy that creates invoices via the LND REST API and mints/verifies L402 macaroons.
-
-### Flow
-```
-1. Client  →  GET /oracle/btcusd           →  Server
-2. Server  →  402 + WWW-Authenticate       →  Client
-3. Client  →  Pay Lightning invoice         →  LN Network
-4. Client  →  GET + Authorization: L402     →  Server
-5. Server  →  200 + signed assertion        →  Client
+```json
+{
+  "domain": "US_CPI",
+  "canonicalstring": "v1|ECON|US|CPI|326.785|index198284100|2026-02|2026-03-21|BLS|CUUR0000SA0|directapi|1774087200|631660",
+  "signature": "<base64>",
+  "pubkey": "<hex>",
+  "signing_scheme": "secp256k1_ecdsa"
+}
 ```
 
-### 402 Response Headers
+Note: Econ/commodities responses use `canonicalstring` as the field name. Clients must check both:
+```python
+canonical = data.get("canonical") or data.get("canonicalstring")
+```
+
+| Field | Description |
+|-------|-------------|
+| domain | Human-readable identifier |
+| canonical / canonicalstring | The signed message — sole input to verification |
+| signature | Base64-encoded signature |
+| pubkey | Hex-encoded compressed public key |
+| signing_scheme | `secp256k1_ecdsa` (L402) or `ed25519` (x402) |
+
+---
+
+## Payment Protocols
+
+### L402 (Lightning)
+
+```
+1. Client  →  GET /oracle/price/btc/usd         →  L402 proxy
+2. Proxy   →  402 + WWW-Authenticate            →  Client
+3. Client  →  Pay Lightning invoice              →  LN Network
+4. Client  →  GET + Authorization: L402 token   →  L402 proxy
+5. Proxy   →  routes to backend, signs via sidecar
+6. Proxy   →  200 + secp256k1-signed response   →  Client
+```
+
+**402 Response Headers:**
 ```
 HTTP/1.1 402 Payment Required
 Www-Authenticate: L402 macaroon="<base64>", invoice="<bolt11>"
 ```
 
-- `macaroon`: Base64-encoded macaroon (access token, locked until payment)
-- `invoice`: BOLT-11 Lightning invoice
-
-### Authenticated Retry
-
-After paying the invoice, the client obtains the payment preimage and retries:
+**Authenticated Retry:**
 ```
-GET /oracle/btcusd HTTP/1.1
+GET /oracle/price/btc/usd HTTP/1.1
 Authorization: L402 <macaroon>:<preimage_hex>
 ```
 
-### Payment Separation
+### x402 (USDC on Base)
 
-The oracle servers contain **zero payment logic**. The L402 proxy sits in front as a reverse proxy and handles:
-- Invoice creation (via the connected LND node's REST API)
-- Payment verification
-- Macaroon issuance and validation
-
-This separation means oracle code is simple, testable, and payment-agnostic.
-
-## Transport
-
-### Endpoints
-
-Oracles expose HTTP GET endpoints. The URL path determines the data type:
-
-| Path | Data |
-|---|---|
-| `/oracle/btcusd` | BTCUSD spot price (median, 9 sources) |
-| `/oracle/btcusd/vwap` | BTCUSD volume-weighted average |
-| `/oracle/ethusd` | ETHUSD spot price (median, 5 sources) |
-| `/oracle/eurusd` | EURUSD spot price (median, 7 sources) |
-| `/oracle/xauusd` | XAU/USD gold spot price (median, 8 sources) |
-| `/oracle/btceur` | BTC/EUR cross-rate (derived from BTCUSD + EURUSD) |
-| `/oracle/solusd` | SOL/USD spot price (median, 9 sources) |
-| `/dlc/oracle/attestations/{id}` | DLC Schnorr attestation (1000 sats) |
-| `/health` | Health check (not payment-gated) |
-| `/oracle/status` | Oracle status (not payment-gated) |
-| `/dlc/oracle/pubkey` | DLC oracle public key (not payment-gated) |
-| `/dlc/oracle/announcements` | DLC nonce commitments (not payment-gated) |
-| `/dlc/oracle/status` | DLC oracle status (not payment-gated) |
-
-### Content Type
-
-All responses are `application/json`.
-
-### No State
-
-Oracle servers are stateless. Each request is independent. No sessions, no subscriptions, no websockets. Pay per query.
-
-## Versioning
-
-The protocol version is the first field in the canonical message (`v1`). Future versions may change the field set, signing scheme, or payment mechanism. Clients should reject messages with unrecognized versions.
-
-## Trust Model
-
-SLO makes no claims about oracle honesty. The protocol provides:
-
-- **Authentication**: The signature proves which key signed the assertion
-- **Integrity**: The canonical format ensures the signed message is unambiguous
-- **Payment**: L402 ensures data is not released without payment
-
-The protocol does **not** provide:
-
-- **Truthfulness**: An oracle can sign a wrong price
-- **Availability**: An oracle can go offline
-- **Consistency**: Different oracles may return different prices
-
-These properties are the client's responsibility, achieved through:
-
-- **Pubkey pinning**: Only accept responses from known oracle keys
-- **Quorum**: Query multiple independent oracles
-- **Coherence checks**: Reject prices that diverge beyond a threshold
-- **Staleness checks**: Reject timestamps older than acceptable
-
-## Extending the Protocol
-
-### New Data Types
-
-Any data that can be expressed as a key-value assertion fits the canonical format:
 ```
-v1|ETHUSD|3241.50|USD|2|2026-02-13T18:44:30Z|890124|coinbase,kraken|median
-v1|GOLD_OZ|2045.30|USD|2|2026-02-13T18:44:30Z|890125|kitco,lbma|median
-v1|FED_RATE|5.25|PCT|2|2026-02-13T18:44:30Z|890126|federalreserve|direct
-v1|TEMP_NYC|72.4|F|1|2026-02-13T18:44:30Z|890127|noaa,openweather|median
+1. Client  →  GET /oracle/price/btc/usd           →  x402 proxy
+2. Proxy   →  402 + payment requirements          →  Client
+3. Client  →  Sign EIP-3009 transferWithAuthorization
+4. Client  →  GET + X-Payment header              →  x402 proxy
+5. Proxy   →  verify payment, sign with Ed25519
+6. Proxy   →  200 + Ed25519-signed response       →  Client
 ```
 
-The protocol is data-agnostic. The `domain`, `sources`, and `method` fields adapt to the data type. The signing and payment mechanisms remain identical.
+**402 Response:**
+```json
+{
+  "x402Version": 1,
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "maxAmountRequired": "10000",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "payTo": "0xYOUR_PAYMENT_ADDRESS",
+      "resource": "https://api.myceliasignal.com/oracle/price/btc/usd",
+      "mimeType": "application/json",
+      "maxTimeoutSeconds": 300
+    }
+  ]
+}
+```
 
-### Multi-Operator Federation
+`maxAmountRequired` is in USDC atomic units (6 decimals): `10000` = $0.01.
 
-The protocol supports multiple independent operators by design. Clients choose which operators to trust and how to aggregate their responses. No coordination between operators is required.
-
-A future version may define a standard discovery mechanism (e.g., DNS-based oracle resolution), but v1 relies on explicit client configuration.
-
-## Design Constraints
-
-These constraints are intentional and will not change:
-
-1. **No oracle registry.** Clients maintain their own list of trusted oracles.
-2. **No governance.** No voting, no staking, no slashing. Market incentives only.
-3. **No subscription model.** Pay per query. No recurring access.
-4. **No client authentication.** Payment is authentication. No API keys, no OAuth.
-5. **No data caching guarantee.** Each query hits the sources live. Freshness over efficiency.
-6. **No consensus between oracles.** Each oracle signs independently. Aggregation is the client's job.
+**Authenticated Retry:**
+```
+GET /oracle/price/btc/usd HTTP/1.1
+X-Payment: <base64-encoded PaymentPayload with EIP-3009 signature>
 ```
 
 ---
 
-Add that to `docs/Protocol.md` (replacing the old version). How's the channel?
-```
-curl -k --header "Grpc-Metadata-macaroon: %MAC%" https://mycelia.m.voltageapp.io:8080/v1/channels/pending
+## Signing Architecture
+
+The x402 proxy (`x402_proxy.py`) acts as a signing sidecar for both payment rails:
+
+- **x402 flow:** Signs responses directly with Ed25519 before returning to client
+- **L402 flow:** The Go L402 proxy routes all paid responses through `/internal/sign/*` on the x402 proxy for secp256k1 ECDSA signing
+
+This design keeps all signing logic in one place (Python, using `coincurve` and `PyNaCl`) while keeping the Go proxy focused on payment logic.
+
+---
+
+## Public Keys
+
+Per-instance keypairs — each GC node has its own identity:
+
+| Node | Rail | Scheme | Public Key |
+|------|------|--------|-----------|
+| US GC | L402 | secp256k1 | `03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf` |
+| Asia GC | L402 | secp256k1 | `02b1377c30c7dcfcba428cf299c18782856a12eb4fab32b87081460f4ba2deab73` |
+| US GC | x402 | Ed25519 | `f4f0e52b5f7b54831f965632bf1ebf72769beda4c4e3d36a593f7729ec812615` |
+| Asia GC | x402 | Ed25519 | `7ab07fbe7d08cd16823e5eb0db0e21f3f38e9366d5fd00d14e95df0fb9b51a1a` |
+
+---
+
+## Pricing
+
+| Category | L402 | x402 |
+|----------|------|------|
+| Spot price pairs & FX | 10 sats | $0.01 |
+| VWAP pairs | 20 sats | $0.02 |
+| Economic indicators | 1,000 sats | $1.00 |
+| Commodities | 1,000 sats | $1.00 |
+
+---
+
+## Transport
+
+All endpoints available at `https://api.myceliasignal.com`. Cloudflare terminates TLS, nginx routes to backends.
+
+**Free endpoints (no payment):**
+- `/health` — proxy health check
+- `/oracle/price/*/preview` — unsigned sample data (5-min stale)
+- `/oracle/econ/*/preview` — unsigned sample data
+- `/.well-known/x402` — payment discovery document
+
+**Legacy redirects:** Old namespace (`/oracle/btcusd` etc.) returns 301 to new namespace permanently.
+
+---
+
+## Trust Model
+
+The protocol provides:
+- **Authentication:** Signature proves which key signed the assertion
+- **Integrity:** Canonical format ensures the signed message is unambiguous
+- **Payment:** L402/x402 ensures data is not released without payment
+
+The protocol does **not** provide:
+- **Truthfulness:** An oracle can sign a wrong value
+- **Availability:** An oracle can go offline
+- **Consistency:** Different nodes may briefly diverge
+
+These are the client's responsibility via pubkey pinning, quorum, coherence checks, and staleness checks.
+
+---
+
+## Design Constraints (Intentional)
+
+1. **No oracle registry.** Clients maintain their own trusted oracle list.
+2. **No governance.** No voting, staking, or slashing. Market incentives only.
+3. **No subscription model.** Pay per query.
+4. **No client authentication.** Payment is authentication. No API keys.
+5. **No data caching guarantee.** Each query hits sources live.
+6. **No consensus between oracles.** Each node signs independently.
+
+---
+
+## Versioning
+
+The protocol version is the first field in the canonical message (`v1`). Clients should reject messages with unrecognized versions. Future versions may change the field set, signing scheme, or payment mechanism.
