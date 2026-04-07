@@ -2,7 +2,7 @@
 
 Pay sats. Pay USDC. Get signed data. Trust math, not middlemen.
 
-Mycelia Signal is a sovereign price oracle serving cryptographically signed attestations over two payment protocols: Lightning (L402) and USDC on Base (x402). 56 endpoints across crypto pairs, FX rates, economic indicators, and commodities. No API keys. No accounts. No trust assumptions.
+Mycelia Signal is a sovereign price oracle serving cryptographically signed attestations over two payment protocols: Lightning (L402) and USDC on Base (x402). 61 endpoints across crypto pairs, stablecoin pegs,, FX rates, economic indicators, and commodities. No API keys. No accounts. No trust assumptions.
 
 **Live API:** [api.myceliasignal.com](https://api.myceliasignal.com)  
 **Docs:** [myceliasignal.com/docs](https://myceliasignal.com/docs)
@@ -25,11 +25,11 @@ curl https://api.myceliasignal.com/health
 
 ---
 
-## Endpoints (56 total)
+## Endpoints (61 total)
 
 All endpoints available on both L402 (Lightning) and x402 (USDC on Base). Append `/preview` to any paid endpoint for free unsigned sample data.
 
-### Crypto Pairs (15 endpoints)
+### Crypto Pairs (16 endpoints)
 | Endpoint | Description | Price |
 |----------|-------------|-------|
 | `/oracle/price/btc/usd` | BTC/USD spot — 9 exchanges | 10 sats / $0.01 |
@@ -39,6 +39,7 @@ All endpoints available on both L402 (Lightning) and x402 (USDC on Base). Append
 | `/oracle/price/btc/jpy` | BTC/JPY spot | 10 sats / $0.01 |
 | `/oracle/price/btc/jpy/vwap` | BTC/JPY VWAP | 20 sats / $0.02 |
 | `/oracle/price/eth/usd` | ETH/USD spot | 10 sats / $0.01 |
+| `/oracle/price/eth/usd/vwap` | ETH/USD 5-min VWAP | 20 sats / $0.02 |
 | `/oracle/price/eth/eur` | ETH/EUR spot | 10 sats / $0.01 |
 | `/oracle/price/eth/jpy` | ETH/JPY spot | 10 sats / $0.01 |
 | `/oracle/price/sol/usd` | SOL/USD spot | 10 sats / $0.01 |
@@ -47,6 +48,12 @@ All endpoints available on both L402 (Lightning) and x402 (USDC on Base). Append
 | `/oracle/price/xrp/usd` | XRP/USD spot | 10 sats / $0.01 |
 | `/oracle/price/ada/usd` | ADA/USD spot | 10 sats / $0.01 |
 | `/oracle/price/doge/usd` | DOGE/USD spot | 10 sats / $0.01 |
+
+### Stablecoin Pegs (4 endpoints)
+- `GET /oracle/price/usdt/usd` — USDT/USD peg (4-source median, 5dp precision)
+- `GET /oracle/price/usdc/usd` — USDC/USD peg (4-source median, 5dp precision)
+- `GET /oracle/price/usdt/eur` — USDT/EUR derived cross-rate (5dp precision)
+- `GET /oracle/price/usdt/jpy` — USDT/JPY derived cross-rate (5dp precision)
 
 ### Precious Metals (3 endpoints)
 | Endpoint | Description | Price |
