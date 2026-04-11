@@ -2,7 +2,7 @@
 
 Pay sats. Pay USDC. Get signed data. Trust math, not middlemen.
 
-Mycelia Signal is a sovereign price oracle serving cryptographically signed attestations over two payment protocols: Lightning (L402) and USDC on Base (x402). 61 endpoints across crypto pairs, stablecoin pegs,, FX rates, economic indicators, and commodities. No API keys. No accounts. No trust assumptions.
+Mycelia Signal is a sovereign price oracle serving cryptographically signed attestations over two payment protocols: Lightning (L402) and USDC on Base (x402). 66 endpoints across crypto pairs, stablecoin pegs, FX rates, economic indicators, commodities, MSVI volatility index, MSXI sentiment index, and MSSI stress index. No API keys. No accounts. No trust assumptions.
 
 **Live API:** [api.myceliasignal.com](https://api.myceliasignal.com)  
 **Docs:** [myceliasignal.com/docs](https://myceliasignal.com/docs)
