@@ -22,8 +22,8 @@ mcp = FastMCP(
         "weather oracle, DeFi yield, and CME COT positioning.\n\n"
         "Payment: x402 (USDC on Base). Every response is Ed25519 signed and independently "
         "verifiable against a published public key. No API keys. No subscriptions.\n\n"
-        "Pricing: \$0.01 (spot/FX/metals/gas/stablecoins), \$0.02 (VWAP), "
-        "\$0.05 (indices: MSVI/MSXI/MSSI/MSTI, DeFi yield), \$0.10 (econ/commodities/COT/marine/weather).\n\n"
+        "Pricing: $0.01 (spot/FX/metals/gas/stablecoins), $0.02 (VWAP), "
+        "$0.05 (indices: MSVI/MSXI/MSSI/MSTI, DeFi yield), $0.10 (econ/commodities/COT/marine/weather).\n\n"
         "Free endpoints: /preview (unsigned sample data), /health, funding rates, basis, open interest.\n\n"
         "Indices overview:\n"
         "  MSVI (Volatility Index): 5-component, 0-100. Per-pair (BTC, ETH).\n"
@@ -113,7 +113,7 @@ def _build_result(data):
 
 @mcp.tool()
 def get_price(base: str, quote: str) -> dict:
-    """Get spot price for any supported pair. Ed25519 signed. \$0.01.
+    """Get spot price for any supported pair. Ed25519 signed. $0.01.
     Supported bases: btc, eth, sol, xrp, ada, doge, xau (gold), eur, gbp, usd, chf, cny, cad, usdt, usdc.
     Supported quotes: usd, eur, jpy, gbp, chf, cny, cad.
     Examples: get_price("btc", "usd"), get_price("xau", "eur"), get_price("eur", "jpy")"""
@@ -121,7 +121,7 @@ def get_price(base: str, quote: str) -> dict:
 
 @mcp.tool()
 def get_vwap(base: str, quote: str) -> dict:
-    """Get 5-minute VWAP price. Ed25519 signed. \$0.02. Available for: btc/usd, btc/eur, eth/usd, eth/eur."""
+    """Get 5-minute VWAP price. Ed25519 signed. $0.02. Available for: btc/usd, btc/eur, eth/usd, eth/eur."""
     return _build_result(_fetch(f"{API_BASE}/oracle/price/{base.lower()}/{quote.lower()}/vwap"))
 
 @mcp.tool()
@@ -131,14 +131,14 @@ def get_price_preview(base: str, quote: str) -> dict:
 
 @mcp.tool()
 def get_volatility(base: str, quote: str) -> dict:
-    """Get MSVI (Mycelia Signal Volatility Index). Ed25519 signed. \$0.05.
+    """Get MSVI (Mycelia Signal Volatility Index). Ed25519 signed. $0.05.
     5 components: Realized Vol (30%), Implied Vol (25%), Term Structure (15%), Funding Rate (20%), Put/Call Ratio (10%). Output: 0-100.
     Available for: btc/usd, eth/usd."""
     return _build_result(_fetch(f"{API_BASE}/oracle/volatility/{base.lower()}/{quote.lower()}"))
 
 @mcp.tool()
 def get_sentiment(base: str, quote: str) -> dict:
-    """Get MSXI (Mycelia Signal Sentiment Index). Ed25519 signed. \$0.05.
+    """Get MSXI (Mycelia Signal Sentiment Index). Ed25519 signed. $0.05.
     5 components: Funding Rate (30%), Options Skew (25%), Put/Call Ratio (20%), Term Structure (15%), Cross-exchange Basis (10%).
     Output: -100 to +100. Regimes: EXTREMEBULLISH, BULLISH, NEUTRAL, BEARISH, EXTREMEBEARISH.
     Available for: btc/usd, eth/usd."""
@@ -146,14 +146,14 @@ def get_sentiment(base: str, quote: str) -> dict:
 
 @mcp.tool()
 def get_stress() -> dict:
-    """Get MSSI (Mycelia Signal Stress Index). Ed25519 signed. \$0.05.
+    """Get MSSI (Mycelia Signal Stress Index). Ed25519 signed. $0.05.
     4 components: Volatility Regime (30%), Stablecoin Stress (25%), Funding Extremity (30%), Funding Dispersion (15%).
     Output: 0-100. Regimes: CALM, ELEVATED, HIGH, EXTREME. Market-wide single number."""
     return _build_result(_fetch(f"{API_BASE}/oracle/stress/market"))
 
 @mcp.tool()
 def get_contagion() -> dict:
-    """Get MSTI (Mycelia Signal Contagion Index). Ed25519 signed. \$0.05.
+    """Get MSTI (Mycelia Signal Contagion Index). Ed25519 signed. $0.05.
     Measures crypto-TradFi coupling. 4 components: BTC-equity correlation (30%), Equity Volatility (25%), DXY Momentum (20%), Beta amplification (25%).
     Output: 0-100. Regimes: DECOUPLED, MIXED, COUPLED, CONTAGION. Market-wide single number."""
     return _build_result(_fetch(f"{API_BASE}/oracle/contagion/market"))
@@ -189,51 +189,51 @@ def get_open_interest(base: str, quote: str) -> dict:
 
 @mcp.tool()
 def get_gas(chain: str) -> dict:
-    """Get L1/L2 gas prices and transaction costs. Ed25519 signed. \$0.01.
+    """Get L1/L2 gas prices and transaction costs. Ed25519 signed. $0.01.
     Supported chains: ethereum, polygon, arbitrum, optimism, base, solana."""
     return _build_result(_fetch(f"{API_BASE}/oracle/gas/{chain.lower()}"))
 
 @mcp.tool()
 def get_econ(region: str, indicator: str) -> dict:
-    """Get economic indicator. Ed25519 signed. \$0.10.
+    """Get economic indicator. Ed25519 signed. $0.10.
     US: cpi, cpi_core, unrate, nfp, fedfunds, gdp, pce, yield_curve.
     EU: hicp, hicp_core, hicp_services, unrate, gdp, employment."""
     return _build_result(_fetch(f"{API_BASE}/oracle/econ/{region.lower()}/{indicator.lower()}"))
 
 @mcp.tool()
 def get_commodity(name: str) -> dict:
-    """Get commodity price. Ed25519 signed. \$0.10. Supported: wti, brent, natgas, copper, dxy."""
+    """Get commodity price. Ed25519 signed. $0.10. Supported: wti, brent, natgas, copper, dxy."""
     return _build_result(_fetch(f"{API_BASE}/oracle/econ/commodities/{name.lower()}"))
 
 @mcp.tool()
 def get_cot(asset: str) -> dict:
-    """Get CME Commitments of Traders positioning. Ed25519 signed. \$0.10. Supported: btc."""
+    """Get CME Commitments of Traders positioning. Ed25519 signed. $0.10. Supported: btc."""
     return _build_result(_fetch(f"{API_BASE}/oracle/cot/{asset.lower()}"))
 
 @mcp.tool()
 def get_marine_sea_state(lat: float, lon: float) -> dict:
-    """Get sea state data for coordinates. Ed25519 signed. \$0.10."""
+    """Get sea state data for coordinates. Ed25519 signed. $0.10."""
     return _build_result(_fetch(f"{API_BASE}/oracle/marine/{lat}/{lon}"))
 
 @mcp.tool()
 def get_marine_route_summary() -> dict:
-    """Get marine route summary. Ed25519 signed. \$0.10."""
+    """Get marine route summary. Ed25519 signed. $0.10."""
     return _build_result(_fetch(f"{API_BASE}/oracle/marine/route/summary"))
 
 @mcp.tool()
 def get_marine_voyage_forecast() -> dict:
-    """Get marine voyage forecast. Ed25519 signed. \$0.10."""
+    """Get marine voyage forecast. Ed25519 signed. $0.10."""
     return _build_result(_fetch(f"{API_BASE}/oracle/marine/voyage/forecast"))
 
 @mcp.tool()
 def get_weather(metric: str, lat: float, lon: float, window: int) -> dict:
-    """Get parametric weather data. Ed25519 signed. \$0.10.
+    """Get parametric weather data. Ed25519 signed. $0.10.
     metric: temperature, rainfall, wind, drought. window: days (7, 14, 30)."""
     return _build_result(_fetch(f"{API_BASE}/oracle/weather/{lat}/{lon}/{metric}/{window}d"))
 
 @mcp.tool()
 def get_defi_yield(protocol: str = "", chain: str = "") -> dict:
-    """Get DeFi yield data. Ed25519 signed. \$0.05."""
+    """Get DeFi yield data. Ed25519 signed. $0.05."""
     params = [f"protocol={protocol}" for p in [protocol] if p] + [f"chain={chain}" for c in [chain] if c]
     qs = f"?{'&'.join(params)}" if params else ""
     return _build_result(_fetch(f"{API_BASE}/oracle/defi/yield{qs}"))
