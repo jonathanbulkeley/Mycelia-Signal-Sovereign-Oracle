@@ -44,9 +44,9 @@ Or add to Claude Desktop config (`claude_desktop_config.json`):
 | `get_marine_sea_state(lat, lon)` | Sea state data | $0.10 |
 | `get_weather(metric, lat, lon, window)` | Parametric weather | $0.10 |
 | `get_defi_yield()` | DeFi protocol yields | $0.05 |
-| `get_funding(base, quote)` | 10-exchange funding rates | **Free** |
-| `get_basis(base, quote)` | Cross-exchange basis | **Free** |
-| `get_open_interest(base, quote)` | Aggregated OI | **Free** |
+| `get_funding(base, quote)` | 10-exchange funding rates | $0.05 |
+| `get_basis(base, quote)` | Cross-exchange basis | $0.02 |
+| `get_open_interest(base, quote)` | Aggregated OI | $0.01 |
 | `get_price_preview(base, quote)` | Unsigned sample data | **Free** |
 | `get_health()` | API health check | **Free** |
 
