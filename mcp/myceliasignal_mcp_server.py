@@ -173,19 +173,19 @@ def get_funding(base: str, quote: str) -> dict:
     """Get 10-exchange OI-weighted composite funding rate. Ed25519 signed. $0.05.
     Exchanges: Binance, Bybit, OKX, Deribit, Hyperliquid, dYdX, Bitget, Kraken, Coinbase INTX, Crypto.com.
     Available for: btc/usd, eth/usd, sol/usd."""
-    return _build_result(_fetch(f"{API_BASE}/oracle/funding/{base.lower()}/{quote.lower()}")
+    return _build_result(_fetch(f"{API_BASE}/oracle/funding/{base.lower()}/{quote.lower()}"))
 
 @mcp.tool()
 def get_basis(base: str, quote: str) -> dict:
     """Get cross-exchange spot-perp basis spread. Ed25519 signed. $0.02. Returns per-exchange basis and annualized carry from 7 exchanges.
     Available for: btc/usd, eth/usd, sol/usd."""
-    return _build_result(_fetch(f"{API_BASE}/oracle/basis/{base.lower()}/{quote.lower()}")
+    return _build_result(_fetch(f"{API_BASE}/oracle/basis/{base.lower()}/{quote.lower()}"))
 
 @mcp.tool()
 def get_open_interest(base: str, quote: str) -> dict:
     """Get aggregated open interest across exchanges. Ed25519 signed. $0.01. OI normalized to USD.
     Available for: btc/usd, eth/usd, sol/usd."""
-    return _build_result(_fetch(f"{API_BASE}/oracle/oi/{base.lower()}/{quote.lower()}")
+    return _build_result(_fetch(f"{API_BASE}/oracle/oi/{base.lower()}/{quote.lower()}"))
 
 @mcp.tool()
 def get_gas(chain: str) -> dict:
