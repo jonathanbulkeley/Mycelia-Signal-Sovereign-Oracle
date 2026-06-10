@@ -16,14 +16,16 @@ from fastmcp import FastMCP
 mcp = FastMCP(
     name="Mycelia Signal Oracle",
     instructions=(
-        "You have access to Mycelia Signal — a sovereign cryptographic oracle with 131 endpoints "
+        "You have access to Mycelia Signal — a sovereign cryptographic oracle with 168 endpoints "
         "across crypto prices, FX rates, precious metals, stablecoin pegs, economic indicators, "
         "commodities, gas oracles, volatility/sentiment/stress/contagion indices, marine oracle, "
-        "weather oracle, DeFi yield, and CME COT positioning.\n\n"
+        "weather oracle, DeFi yield, COT positioning, LLM inference pricing, economic calendar, "
+        "DeFi protocol metrics, liquidation flow, and signed historical data.\n\n"
         "Payment: x402 (USDC on Base). Every response is Ed25519 signed and independently "
         "verifiable against a published public key. No API keys. No subscriptions.\n\n"
-        "Pricing: $0.01 (spot/FX/metals/gas/stablecoins), $0.02 (VWAP), "
-        "$0.05 (indices: MSVI/MSXI/MSSI/MSTI, DeFi yield), $0.10 (econ/commodities/COT/marine/weather).\n\n"
+        "Pricing: $0.01 (spot/FX/metals/gas/stablecoins), $0.02 (VWAP/inference), "
+        "$0.05 (indices, DeFi yield, DeFi metrics, liq flow, calendar, history spot/funding), "
+        "$0.10 (econ/COT/marine/weather/history index/surprises).\n\n"
         "Free endpoints: /preview (unsigned sample data), /health, funding rates, basis, open interest.\n\n"
         "Indices overview:\n"
         "  MSVI (Volatility Index): 5-component, 0-100. Per-pair (BTC, ETH).\n"
@@ -266,6 +268,96 @@ def get_health() -> dict:
 def get_catalogue() -> dict:
     """Get full endpoint catalogue with pricing. Free."""
     return _fetch(f"{API_BASE}/sho/info")
+
+
+@mcp.tool()
+def get_inference_pricing(provider: str) -> dict:
+    """Get LLM inference pricing. Ed25519 signed. $0.02.
+    6 providers: openai, anthropic, groq, together, fireworks, cerebras.
+    Returns all models with input/output $/M tokens and context windows.
+    Special queries: 'all' (all 26 models), 'compare' (cheapest per tier),
+    'task/chat', 'task/code', 'task/reasoning', 'task/long_context', 'task/fast'."""
+    if provider.lower() in ("all", "compare"):
+        return _build_result(_fetch(f"{API_BASE}/oracle/inference/{provider.lower()}"))
+    if provider.lower().startswith("task/"):
+        task = provider.lower().split("/", 1)[1]
+        return _build_result(_fetch(f"{API_BASE}/oracle/inference/compare/task/{task}"))
+    return _build_result(_fetch(f"{API_BASE}/oracle/inference/{provider.lower()}/pricing"))
+
+
+@mcp.tool()
+def get_econ_calendar(query: str = "today") -> dict:
+    """Get economic calendar and macro event data. Ed25519 signed. $0.05-$0.10.
+    query options:
+      'today'      — today's events ($0.05)
+      'calendar'   — next 30 days priority events ($0.05)
+      'fomc'       — next FOMC meeting ($0.05)
+      'us'         — US events next 30 days ($0.05)
+      'eu'         — EU events next 30 days ($0.05)
+      'surprises'  — last 20 actual vs consensus deviations ($0.10)
+      'expiry/btc' — next 8 BTC Deribit expiries ($0.05)
+      'expiry/eth' — next 8 ETH Deribit expiries ($0.05)"""
+    q = query.lower().strip()
+    if q == "today":
+        return _build_result(_fetch(f"{API_BASE}/oracle/econ/calendar/today"))
+    elif q == "calendar":
+        return _build_result(_fetch(f"{API_BASE}/oracle/econ/calendar"))
+    elif q == "fomc":
+        return _build_result(_fetch(f"{API_BASE}/oracle/econ/calendar/fomc"))
+    elif q in ("us", "eu", "gb", "jp", "cn"):
+        return _build_result(_fetch(f"{API_BASE}/oracle/econ/calendar/country/{q}"))
+    elif q == "surprises":
+        return _build_result(_fetch(f"{API_BASE}/oracle/econ/surprises"))
+    elif q.startswith("expiry/"):
+        ccy = q.split("/")[1]
+        return _build_result(_fetch(f"{API_BASE}/oracle/econ/expiry/{ccy}"))
+    else:
+        return {"error": f"Unknown query '{query}'. Use: today, calendar, fomc, us, eu, surprises, expiry/btc, expiry/eth"}
+
+
+@mcp.tool()
+def get_defi_metrics(protocol: str = "all") -> dict:
+    """Get DeFi protocol metrics — TVL, APR, utilization. Ed25519 signed. $0.05.
+    protocol: 'all' (all 8 protocols, ~$25B TVL), 'aave', 'compound', 'morpho', 'spark', 'sky'.
+    Data from DeFiLlama + on-chain. 30-min refresh."""
+    if protocol.lower() == "all":
+        return _build_result(_fetch(f"{API_BASE}/oracle/defi/metrics"))
+    return _build_result(_fetch(f"{API_BASE}/oracle/defi/metrics/{protocol.lower()}"))
+
+
+@mcp.tool()
+def get_liquidation_flow(currency: str, window: str = "1h") -> dict:
+    """Get liquidation flow data. Ed25519 signed. $0.05.
+    currency: btc, eth, sol.
+    window: '1h', '4h', '24h' (default: '1h').
+    Returns long/short notional, dominant side, largest event, by-exchange breakdown.
+    From live event logger with 94K+ events and 31 days history."""
+    w = window if window in ("1h", "4h", "24h") else "1h"
+    return _build_result(_fetch(f"{API_BASE}/oracle/liq-flow/{currency.lower()}?window={w}"))
+
+
+@mcp.tool()
+def get_historical(query: str, from_ts: str = "", to_ts: str = "", interval: str = "1h", exchange: str = "") -> dict:
+    """Get signed historical data. Batch Ed25519 signed. $0.05-$0.10.
+    query: 'spot/btc/usd', 'spot/eth/usd', 'funding/btc/usd', 'funding/eth/usd',
+           'index/msxi/btcusd', 'index/msxi/ethusd', 'index/msvi/btcusd', 'index/msvi/ethusd',
+           'index/mssi', 'index/msti'.
+    from_ts/to_ts: ISO timestamp or Unix epoch. Default: last 1h.
+    interval: for spot — '1m','5m','15m','1h','4h','1d'. Default: '1h'.
+    exchange: for funding — e.g. 'binance'. Required for ranges >6h.
+    Index rows include ORIGINAL per-row signatures from collection time."""
+    path = f"/oracle/history/{query.lower()}"
+    params = []
+    if from_ts:
+        params.append(f"from={from_ts}")
+    if to_ts:
+        params.append(f"to={to_ts}")
+    if interval and "spot" in query.lower():
+        params.append(f"interval={interval}")
+    if exchange and "funding" in query.lower():
+        params.append(f"exchange={exchange}")
+    qs = "?" + "&".join(params) if params else ""
+    return _build_result(_fetch(f"{API_BASE}{path}{qs}"))
 
 if __name__ == "__main__":
     mcp.run()
