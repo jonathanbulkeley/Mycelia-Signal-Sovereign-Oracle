@@ -1,8 +1,8 @@
 # Mycelia Signal — Sovereign Oracle
 
-Pay USDC. Get signed data. Trust math, not middlemen.
+Pay sats. Pay USDC. Get signed data. Trust math, not middlemen.
 
-Mycelia Signal is a sovereign cryptographic oracle serving Ed25519-signed attestations across 131 endpoints: crypto prices, FX rates, precious metals, stablecoin pegs, economic indicators, commodities, gas oracles, volatility/sentiment/stress/contagion indices, marine oracle, weather oracle, DeFi yield, and CME COT positioning. Pay-per-query via x402 (USDC on Base). No API keys. No accounts. No trust assumptions.
+Mycelia Signal is a sovereign cryptographic oracle serving Ed25519-signed attestations across 190 endpoints: crypto prices, FX rates, precious metals, stablecoin pegs, economic indicators, commodities, gas oracles, volatility/sentiment/stress/contagion indices, marine oracle, weather oracle, DeFi yield, and CME COT positioning. Pay-per-query via x402 (USDC on Base) or L402 (Lightning). No API keys. No accounts. No trust assumptions.
 
 **Live API:** [api.myceliasignal.com](https://api.myceliasignal.com)
 **Docs:** [myceliasignal.com/docs](https://myceliasignal.com/docs)
@@ -20,12 +20,15 @@ Mycelia Signal is a sovereign cryptographic oracle serving Ed25519-signed attest
     # Paid — returns 402 with x402 payment details
     curl -i https://api.myceliasignal.com/oracle/price/btc/usd
 
+    # Paid via L402 (Lightning) — returns 402 with macaroon + invoice
+    curl -i https://api.myceliasignal.com/l402/oracle/price/btc/usd
+
     # Health check
     curl https://api.myceliasignal.com/health
 
 ---
 
-## Endpoints (131 total)
+## Endpoints (190 total)
 
 All paid endpoints return Ed25519-signed canonical attestations. Append `/preview` for free unsigned sample data.
 
@@ -52,9 +55,15 @@ Ethereum, Polygon, Arbitrum, Optimism, Base, Solana.
 | **MSXI** (Sentiment) | 5-component: funding direction, skew, put/call, term structure, basis | -100 to +100 |
 | **MSSI** (Stress) | 4-component: vol regime, stablecoin stress, funding extremity, dispersion | 0-100 |
 | **MSTI** (Contagion) | 4-component: BTC-equity correlation, equity vol, DXY, beta | 0-100 |
+| **MESI** (Equity Stress) | Cross-asset equity stress composite | 0-100 |
+| **MNVI** (NQ Volatility) | Nasdaq volatility index | 0-100 |
+| **MSLI** (Leadership) | Equity sector leadership | 0-100 |
+| **MSBI** (Breadth) | Equity market breadth | 0-100 |
+| **MSERC** (Equity Regime) | Equity regime composite | 0-100 |
+| **MSRI** (Rotation) | 11-sector ETF rotation | 0-100 |
 
 ### MSFR Funding Rate — $0.05
-10-exchange OI-weighted composite (Binance, Bybit, OKX, Deribit, Hyperliquid, dYdX, Bitget, Kraken, Coinbase INTX, Crypto.com). Basis and OI also available.
+11-exchange OI-weighted composite (Binance, Bybit, OKX, Deribit, Hyperliquid, dYdX, Bitget, Kraken, Coinbase INTX, Crypto.com, Bullish). Basis and OI also available.
 
 ### Economic Indicators — $0.10
 US (8): CPI, CPI Core, Unemployment, NFP, Fed Funds, GDP, PCE, Yield Curve.
@@ -75,14 +84,16 @@ Cross-protocol yield data.
 ### CME COT — $0.10
 Institutional positioning from CME futures.
 
-### DLC Oracle — Free
-Discreet Log Contract attestations.
+### DLC Oracle
+BIP-340 Schnorr attestations for Bitcoin-native derivatives.
+Announcement pulls are free at `/dlc/oracle/announcements`.
+Publishing a custom event is $7.00 — threshold, enum or numeric.
 
 ---
 
 ## MCP Server
 
-17 parameterized tools covering all 131 endpoints. See [mcp/](./mcp/).
+28 parameterized tools covering all 190 endpoints. See [mcp/](./mcp/).
 
 Claude Desktop config:
 
@@ -119,7 +130,7 @@ Every response includes an Ed25519 signature over a canonical attestation string
 
     v1|PRICE|BTCUSD|73242.09|USD|2|binance,coinbase,kraken,...|median|1748012345|562204
 
-Verify with the public key from `/health`. See [docs/verification](https://myceliasignal.com/docs/verification/).
+Verify with the public key from `/keys/ed25519`. See [docs/verification](https://myceliasignal.com/docs/verification/).
 
 ---
 
