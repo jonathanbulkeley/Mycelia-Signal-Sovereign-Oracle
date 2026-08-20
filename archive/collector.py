@@ -20,7 +20,7 @@ import requests
 
 # ── Configuration ──────────────────────────────────────────────────
 
-ARCHIVE_DIR = Path(os.path.expanduser("~/slo/repo/archive"))
+ARCHIVE_DIR = Path(os.path.expanduser("~/sovereign-oracle/archive"))
 DB_PATH = ARCHIVE_DIR / "attestations.db"
 PUBLIC_DIR = ARCHIVE_DIR / "public"
 POLL_INTERVAL = 60  # seconds
@@ -68,6 +68,11 @@ ORACLES = {
     "CNYJPY":           {"base": PRICE_BASE,     "path": "/oracle/price/cny/jpy"},
     "CNYCAD":           {"base": PRICE_BASE,     "path": "/oracle/price/cny/cad"},
     "CADJPY":           {"base": PRICE_BASE,     "path": "/oracle/price/cad/jpy"},
+    "USDTUSD":          {"base": PRICE_BASE,     "path": "/oracle/price/usdt/usd"},
+    "USDCUSD":          {"base": PRICE_BASE,     "path": "/oracle/price/usdc/usd"},
+    "USDTEUR":          {"base": PRICE_BASE,     "path": "/oracle/price/usdt/eur"},
+    "USDTJPY":          {"base": PRICE_BASE,     "path": "/oracle/price/usdt/jpy"},
+    "ETHUSDVWAP":       {"base": PRICE_BASE,     "path": "/oracle/price/eth/usd/vwap"},
     "US_CPI":           {"base": ECON_US_BASE,   "path": "/oracle/econ/us/cpi/preview"},
     "US_CPI_CORE":      {"base": ECON_US_BASE,   "path": "/oracle/econ/us/cpi_core/preview"},
     "US_UNRATE":        {"base": ECON_US_BASE,   "path": "/oracle/econ/us/unrate/preview"},
@@ -95,7 +100,7 @@ DLC_ATTESTATIONS_PATH = "/dlc/oracle/attestations"
 PUBKEYS = {
     "l402_secp256k1": "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
     "x402_ed25519":   "f4f0e52b5f7b54831f965632bf1ebf72769beda4c4e3d36a593f7729ec812615",
-    "dlc_schnorr":    "03c1955b8c543494c4ecd86d167105bcc7ca9a91b8e06cb9d6601f2f55a89abfbf",
+    "dlc_schnorr":    "03ff5589b5812f07dec1aad7af189e0513160799820386128a80d37d1503a8e84f",
 }
 
 PREVIEW_PAIRS = {k for k, v in ORACLES.items() if "/preview" in v["path"]}
