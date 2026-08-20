@@ -19,3 +19,6 @@ creds/
 *.key
 *.pem
 *.macaroon
+
+# Backups
+*.bak*
