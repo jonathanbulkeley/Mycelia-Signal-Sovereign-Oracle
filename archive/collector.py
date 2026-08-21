@@ -167,7 +167,11 @@ def get_conn():
 
 def parse_canonical(canonical):
     """Parse Oracle Attestation Spec v0.4 canonical string.
-    Price: v1|PRICE|PAIR|PRICE|CURRENCY|DECIMALS|TIMESTAMP|NONCE|SOURCES|METHOD
+    Price: v1|PRICE|PAIR|PRICE|CURRENCY|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE
+    NOTE: sources/method precede timestamp/nonce. The previous docstring had
+    them the other way round and the parser followed it, so from 2026-03-18
+    until this fix `timestamp` received the source list and `sources` received
+    the epoch. raw_response was unaffected; a backfill can repair the columns.
     Econ:  v1|REGION|INDICATOR|VALUE|UNIT|...|NONCE
     """
     parts = canonical.split("|")
@@ -179,10 +183,10 @@ def parse_canonical(canonical):
             "price":     parts[3],
             "currency":  parts[4],
             "decimals":  parts[5] if len(parts) > 5 else "",
-            "timestamp": parts[6] if len(parts) > 6 else "",
-            "nonce":     parts[7] if len(parts) > 7 else "",
-            "sources":   parts[8].split(",") if len(parts) > 8 else [],
-            "method":    parts[9] if len(parts) > 9 else "",
+            "sources":   parts[6].split(",") if len(parts) > 6 else [],
+            "method":    parts[7] if len(parts) > 7 else "",
+            "timestamp": parts[8] if len(parts) > 8 else "",
+            "nonce":     parts[9] if len(parts) > 9 else "",
         }
     elif len(parts) >= 4:
         return {
@@ -264,9 +268,18 @@ def poll_oracles():
             resp = requests.get(url, timeout=30)
             resp.raise_for_status()
             data = resp.json()
+            # Record the scheme and key the response ACTUALLY carried, not an
+            # assumed one. These were hardcoded to l402/secp256k1 for every
+            # price oracle from 2026-03-18 until this fix, while the oracles
+            # sign Ed25519 with f4f0e52b... -- so the indexed pubkey and
+            # sig_scheme columns contradicted each row's own raw_response and
+            # anyone verifying from the columns would fail every check.
             archive_oracle_response(
                 conn, "collector", pair, data,
-                "ecdsa_secp256k1", PUBKEYS["l402_secp256k1"],
+                data.get("signingScheme") or data.get("sigScheme")
+                    or "ecdsa_secp256k1",
+                data.get("pubkey") or data.get("public_key")
+                    or PUBKEYS["l402_secp256k1"],
                 is_preview=is_preview
             )
             archived += 1
