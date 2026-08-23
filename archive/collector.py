@@ -2,10 +2,15 @@
 """
 Mycelia Signal — Attestation Archive Collector
 Polls oracle backends every 60s and archives signed responses to SQLite.
-Updated Mar 17 2026 — new stack endpoints, spec v0.4 canonical parsing.
+Writes to: ~/sovereign-oracle/archive/attestations.db  (see ARCHIVE_DIR below)
+Exports to: ~/sovereign-oracle/archive/public/ (daily JSONL + manifest)
 
-Writes to: ~/slo/repo/archive/attestations.db
-Exports to: ~/slo/repo/archive/public/ (daily JSONL + manifest)
+NOTE ON THE CANONICAL FORMAT -- two layouts exist. Rows before ~2026-05-26 use
+...|DECIMALS|TIMESTAMP|NONCE|SOURCES|METHOD; later rows use
+...|DECIMALS|SOURCES|METHOD|TIMESTAMP|NONCE. This docstring previously claimed
+a single "spec v0.4" layout and the parser drifted from reality for five
+months, mis-indexing 1.75M rows. Any future reparse must handle both -- see
+backfill_attestations.py.
 """
 
 import sqlite3
